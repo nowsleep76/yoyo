@@ -282,7 +282,7 @@ def main():
             '거래량': '{:,.0f}',
             '거래량변화 (%)': '{:+.2f}%',
             '스코어': '{:.1f}'
-        }).applymap(style_dataframe),
+        }).map(style_dataframe),
         use_container_width=True
     )
 
