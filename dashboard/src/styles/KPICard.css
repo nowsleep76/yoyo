@@ -1,0 +1,92 @@
+.kpi-card {
+  background: white;
+  border-radius: 12px;
+  padding: 25px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  cursor: pointer;
+}
+
+.kpi-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.2);
+}
+
+.kpi-icon {
+  font-size: 2.5rem;
+  line-height: 1;
+  min-width: 60px;
+  text-align: center;
+}
+
+.kpi-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.kpi-title {
+  margin: 0 0 8px 0;
+  font-size: 0.95rem;
+  color: #666;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.kpi-value {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  font-size: 1.8rem;
+  font-weight: 700;
+  color: #333;
+}
+
+.kpi-value.positive {
+  color: #70AD47;
+}
+
+.kpi-value.negative {
+  color: #ED7D31;
+}
+
+.kpi-unit {
+  font-size: 0.9rem;
+  color: #999;
+  font-weight: 500;
+}
+
+.kpi-sales {
+  border-left: 4px solid #4472C4;
+}
+
+.kpi-growth {
+  border-left: 4px solid #70AD47;
+}
+
+.kpi-count {
+  border-left: 4px solid #FFC000;
+}
+
+@media (max-width: 768px) {
+  .kpi-card {
+    padding: 20px;
+    gap: 15px;
+  }
+
+  .kpi-icon {
+    font-size: 2rem;
+    min-width: 50px;
+  }
+
+  .kpi-value {
+    font-size: 1.5rem;
+  }
+
+  .kpi-title {
+    font-size: 0.85rem;
+  }
+}

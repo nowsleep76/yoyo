@@ -1,0 +1,16 @@
+CategoryID,CategoryName,Department,Manager,EstablishedDate,Status
+CAT001,의류,패션,김철수,2020-01-15,Active
+CAT002,가구,홈리빙,박영희,2019-06-20,Active
+CAT003,생활용품,가정용품,이민준,2021-03-10,Active
+CAT004,전자제품,가전,정수현,2018-12-01,Active
+CAT005,뷰티,뷰티앤헬스,최보라,2020-08-25,Active
+CAT006,스포츠용품,레져,정재훈,2021-05-10,Active
+CAT007,식품,푸드,박미영,2019-11-08,Active
+CAT008,도서,문화,이준호,2020-03-22,Active
+CAT009,반려동물용품,펫러브,강소연,2021-09-14,Active
+CAT010,개인용기기,테크,유승현,2020-07-30,Active
+CAT011,건강식품,웰니스,이수현,2021-02-18,Active
+CAT012,악세서리,패션,김철수,2020-11-05,Active
+CAT013,주방용품,가정용품,이민준,2021-01-20,Active
+CAT014,침구류,홈리빙,박영희,2019-09-12,Active
+CAT015,완구,키즈,최민지,2020-04-28,Active
