@@ -1,0 +1,105 @@
+.tide-card {
+  background: white;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 4px 12px rgba(0, 102, 204, 0.1);
+  margin-bottom: 20px;
+}
+
+.tide-card.loading,
+.tide-card.error {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 200px;
+  color: #666;
+  font-size: 14px;
+}
+
+.tide-card.error {
+  color: #e74c3c;
+}
+
+.tide-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+  border-bottom: 2px solid #f0f0f0;
+  padding-bottom: 10px;
+}
+
+.tide-header h3 {
+  font-size: 18px;
+  color: #0066cc;
+  margin: 0;
+}
+
+.tide-number {
+  background: linear-gradient(135deg, #0066cc, #0052a3);
+  color: white;
+  padding: 6px 16px;
+  border-radius: 20px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.tide-times {
+  margin-bottom: 20px;
+}
+
+.tide-times h4 {
+  font-size: 14px;
+  color: #333;
+  margin-bottom: 10px;
+}
+
+.times-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.time-badge {
+  background: #f0f8ff;
+  border: 1px solid #0066cc;
+  color: #0066cc;
+  padding: 6px 12px;
+  border-radius: 16px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.chart-container {
+  margin: 20px 0;
+  padding: 15px;
+  background: #fafafa;
+  border-radius: 8px;
+}
+
+.chart-container svg {
+  font-family: 'Noto Sans KR', sans-serif;
+}
+
+.tide-info {
+  text-align: center;
+  color: #666;
+  font-size: 12px;
+  padding-top: 10px;
+  border-top: 1px solid #f0f0f0;
+}
+
+.tide-info i {
+  color: #0066cc;
+  margin-right: 6px;
+}
+
+@media (max-width: 768px) {
+  .tide-card {
+    padding: 15px;
+  }
+
+  .chart-container {
+    padding: 10px;
+  }
+}

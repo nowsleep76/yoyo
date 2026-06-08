@@ -1,0 +1,678 @@
+.tide-page {
+  min-height: 100vh;
+  background: #f5f7fa;
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  margin: 0;
+}
+
+/* 헤더 */
+.tide-header {
+  background: linear-gradient(135deg, #7b6d65 0%, #9a8b82 100%);
+  color: white;
+  padding: 15px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.header-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.tide-header h1 {
+  font-size: 22px;
+  font-weight: 700;
+  margin: 0;
+}
+
+.location-btn {
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  padding: 6px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  transition: all 0.2s;
+}
+
+.location-btn:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+/* 위치 선택 모달 */
+.location-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: flex-end;
+  z-index: 1000;
+}
+
+.location-modal {
+  width: 100%;
+  background: white;
+  border-radius: 16px 16px 0 0;
+  padding: 20px;
+  max-height: 70vh;
+  overflow-y: auto;
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  padding-bottom: 15px;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.modal-header h2 {
+  font-size: 18px;
+  font-weight: 700;
+  margin: 0;
+  color: #333;
+}
+
+.close-btn {
+  background: none;
+  border: none;
+  font-size: 20px;
+  cursor: pointer;
+  color: #999;
+  padding: 0;
+  width: 24px;
+  height: 24px;
+}
+
+.region-selector {
+  padding: 20px 0;
+}
+
+.region-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #666;
+  margin-bottom: 15px;
+}
+
+.region-buttons {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+.region-btn {
+  padding: 12px;
+  background: #f0f0f0;
+  border: 2px solid #ddd;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.2s;
+}
+
+.region-btn:hover {
+  background: #e8f4ff;
+  border-color: #0066cc;
+}
+
+.spots-list {
+  padding: 20px 0;
+}
+
+.back-btn {
+  background: none;
+  border: none;
+  color: #0066cc;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 8px 0;
+  margin-bottom: 15px;
+}
+
+.spots-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 15px;
+  padding-bottom: 10px;
+  border-bottom: 2px solid #0066cc;
+}
+
+.spots-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+
+.spot-btn {
+  padding: 12px;
+  background: white;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.2s;
+}
+
+.spot-btn:hover {
+  border-color: #0066cc;
+  background: #f9f9f9;
+}
+
+.spot-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 4px;
+}
+
+.spot-species {
+  font-size: 12px;
+  color: #999;
+}
+
+/* 탭 네비게이션 */
+.tab-navigation {
+  display: flex;
+  background: white;
+  border-bottom: 2px solid #e0e0e0;
+}
+
+.tab-btn {
+  flex: 1;
+  padding: 12px;
+  background: none;
+  border: none;
+  font-size: 14px;
+  font-weight: 600;
+  color: #999;
+  cursor: pointer;
+  border-bottom: 3px solid transparent;
+  transition: all 0.3s;
+}
+
+.tab-btn:hover {
+  color: #0066cc;
+}
+
+.tab-btn.active {
+  color: #0066cc;
+  border-bottom-color: #0066cc;
+}
+
+/* 날짜 선택 */
+.date-selector {
+  background: white;
+  padding: 12px;
+  border-bottom: 1px solid #e0e0e0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.date-info {
+  font-size: 13px;
+  font-weight: 600;
+  color: #333;
+  min-width: 140px;
+}
+
+.date-buttons {
+  display: flex;
+  gap: 6px;
+}
+
+.date-buttons button {
+  padding: 6px 10px;
+  background: white;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 600;
+  color: #666;
+  transition: all 0.2s;
+}
+
+.date-buttons button:hover:not(:disabled) {
+  background: #f0f0f0;
+  border-color: #0066cc;
+}
+
+.date-buttons button.active {
+  background: #0066cc;
+  border-color: #0066cc;
+  color: white;
+}
+
+.date-buttons button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* 물때 탭 */
+.tide-content {
+  flex: 1;
+  background: white;
+  border-bottom: 1px solid #e0e0e0;
+  overflow: hidden;
+}
+
+.tide-wrapper {
+  display: flex;
+  height: 100%;
+  gap: 0;
+  position: relative;
+}
+
+.tide-time-axis {
+  flex: 0 0 50px;
+  display: flex;
+  flex-direction: column;
+  padding: 10px 0;
+  border-right: 1px solid #ddd;
+  background: #f9f9f9;
+}
+
+.tide-hour {
+  flex: 1;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 600;
+  color: #666;
+  padding-top: 5px;
+  line-height: 1;
+}
+
+.tide-timeline {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  background:
+    repeating-linear-gradient(
+      to bottom,
+      transparent,
+      transparent calc(25% - 0.5px),
+      #e0e0e0 calc(25% - 0.5px),
+      #e0e0e0 calc(25% + 0.5px)
+    );
+}
+
+.tide-marker {
+  position: absolute;
+  left: 0;
+  right: 0;
+  transform: translateY(-50%);
+  z-index: 10;
+  display: flex;
+  justify-content: flex-start;
+  padding-left: 10px;
+}
+
+.tide-marker.high .marker-box {
+  background: linear-gradient(135deg, #c41e3a, #e74c3c);
+  color: white;
+}
+
+.tide-marker.low .marker-box {
+  background: linear-gradient(135deg, #003d7a, #0066cc);
+  color: white;
+}
+
+.marker-box {
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.marker-title {
+  font-weight: 700;
+}
+
+.marker-value {
+  font-size: 10px;
+  opacity: 0.9;
+}
+
+.tide-weather {
+  flex: 0 0 80px;
+  display: flex;
+  flex-direction: column;
+  border-left: 1px solid #ddd;
+  background: #fafafa;
+  overflow-y: auto;
+}
+
+.weather-cell {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 4px;
+  border-bottom: 1px solid #e0e0e0;
+  font-size: 9px;
+  text-align: center;
+}
+
+.weather-cell:last-child {
+  border-bottom: none;
+}
+
+.weather-hour {
+  font-weight: 600;
+  font-size: 10px;
+  color: #0066cc;
+}
+
+.weather-icon {
+  font-size: 16px;
+}
+
+.weather-temp {
+  font-weight: 600;
+  color: #e74c3c;
+  font-size: 9px;
+}
+
+.weather-wind {
+  font-size: 8px;
+  color: #999;
+}
+
+/* 바람/파고 탭 */
+.wind-content {
+  flex: 1;
+  background: white;
+  overflow-x: auto;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.wind-table-wrapper {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.wind-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.wind-table thead {
+  background: linear-gradient(135deg, #f5f5f5, #efefef);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.wind-table th {
+  padding: 10px 8px;
+  border-bottom: 2px solid #ddd;
+  font-weight: 600;
+  color: #333;
+  text-align: center;
+  font-size: 11px;
+}
+
+.wind-table td {
+  padding: 10px 8px;
+  border-bottom: 1px solid #e8e8e8;
+  text-align: center;
+  font-size: 12px;
+}
+
+.wind-table tbody tr:hover {
+  background: #f9f9f9;
+}
+
+.time-cell {
+  font-weight: 700;
+  color: #0066cc;
+  text-align: center;
+}
+
+.wind-dir-cell {
+  padding: 6px 4px !important;
+}
+
+.wind-direction {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.wind-direction .arrow {
+  font-size: 13px;
+  display: inline-block;
+}
+
+.dir-text {
+  font-size: 10px;
+  color: #666;
+  font-weight: 600;
+}
+
+.wind-speed-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 6px 4px !important;
+}
+
+.wind-speed-cell .current {
+  font-weight: 700;
+}
+
+.wind-speed-cell .max {
+  font-size: 10px;
+  color: #999;
+}
+
+.weather-cell {
+  font-size: 20px;
+  padding: 8px 4px !important;
+}
+
+.temp-cell {
+  font-weight: 700;
+  color: #e74c3c;
+}
+
+.wave-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 6px 4px !important;
+}
+
+.wave-cell .wave-icon {
+  font-size: 14px;
+}
+
+.wave-cell .period {
+  font-size: 10px;
+  color: #999;
+}
+
+/* 지도 */
+.map-section {
+  background: white;
+  height: 250px;
+  border-top: 1px solid #e0e0e0;
+}
+
+.tide-map {
+  width: 100%;
+  height: 100%;
+  border-radius: 0;
+}
+
+/* 로딩 */
+.tide-page.loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  color: #666;
+}
+
+/* 반응형 */
+@media (max-width: 768px) {
+  .date-selector {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .region-buttons {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .tide-wrapper {
+    gap: 0;
+  }
+
+  .tide-time-axis {
+    flex: 0 0 45px;
+  }
+
+  .tide-weather {
+    flex: 0 0 75px;
+  }
+
+  .wind-table {
+    font-size: 11px;
+  }
+
+  .wind-table th,
+  .wind-table td {
+    padding: 8px 6px;
+  }
+}
+
+@media (max-width: 480px) {
+  .tide-header h1 {
+    font-size: 18px;
+  }
+
+  .location-btn {
+    padding: 4px 8px;
+    font-size: 11px;
+  }
+
+  .tab-btn {
+    font-size: 12px;
+    padding: 10px;
+  }
+
+  .date-selector {
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 10px;
+    gap: 8px;
+  }
+
+  .date-info {
+    font-size: 12px;
+    min-width: auto;
+  }
+
+  .date-buttons button {
+    padding: 4px 8px;
+    font-size: 10px;
+  }
+
+  .tide-wrapper {
+    gap: 0;
+    height: 350px;
+  }
+
+  .tide-time-axis {
+    flex: 0 0 40px;
+    font-size: 9px;
+  }
+
+  .tide-hour {
+    font-size: 8px;
+  }
+
+  .tide-weather {
+    flex: 0 0 70px;
+  }
+
+  .weather-cell {
+    padding: 3px;
+    gap: 1px;
+  }
+
+  .weather-icon {
+    font-size: 14px;
+  }
+
+  .weather-hour {
+    font-size: 8px;
+  }
+
+  .weather-temp {
+    font-size: 8px;
+  }
+
+  .weather-wind {
+    font-size: 7px;
+  }
+
+  .region-buttons {
+    grid-template-columns: 1fr;
+  }
+
+  .wind-table {
+    font-size: 10px;
+  }
+
+  .wind-table th,
+  .wind-table td {
+    padding: 6px 4px;
+  }
+
+  .wind-direction .arrow {
+    font-size: 11px;
+  }
+
+  .dir-text {
+    font-size: 8px;
+  }
+
+  .wind-speed-cell .max {
+    font-size: 8px;
+  }
+
+  .weather-cell {
+    font-size: 16px;
+    padding: 6px 2px !important;
+  }
+
+  .wave-cell .wave-icon {
+    font-size: 12px;
+  }
+
+  .map-section {
+    height: 200px;
+  }
+}

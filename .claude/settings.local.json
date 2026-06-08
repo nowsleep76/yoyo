@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pkill -9 python)",
+      "Bash(python)",
+      "Bash(python3)"
+    ]
+  }
+}
