@@ -243,6 +243,9 @@ def get_tide_hourly(latitude, longitude, date_str=None):
         max_height = hourly[max_hour]['height']
         high_tides.append({'hour': max_hour, 'height': round(max_height, 2), 'label': f'{max_hour:02d}:00'})
 
+    # 3시간 단위 데이터 필터링
+    hourly_3h = [h for h in hourly if h['hour'] % 3 == 0]
+
     volume = get_tide_volume(tide_num)
 
     # highTides, lowTides 형식 변환 (camelCase, time 필드 추가)
@@ -252,9 +255,7 @@ def get_tide_hourly(latitude, longitude, date_str=None):
     # 천체 데이터
     celestial_events = [
         {'type': 'sunrise', 'hour': celestial['sunrise'], 'label': '일출'},
-        {'type': 'moonrise', 'hour': celestial['moonrise'], 'label': '월출'},
         {'type': 'sunset', 'hour': celestial['sunset'], 'label': '일몰'},
-        {'type': 'moonset', 'hour': celestial['moonset'], 'label': '월몰'},
     ]
 
     return {
@@ -268,9 +269,12 @@ def get_tide_hourly(latitude, longitude, date_str=None):
             'day': lunar_info['day'],
             'age': lunar_info['age']
         },
-        'hourly': hourly,
+        'sunrise': celestial['sunrise'],
+        'sunset': celestial['sunset'],
+        'hourly': hourly_3h,  # 3시간 단위 데이터
         'highTides': high_tides_camel,
         'lowTides': low_tides_camel,
+        'allHourly': hourly,  # 모든 시간별 데이터 (필요시)
         'celestialEvents': celestial_events,
         'location': {
             'latitude': latitude,

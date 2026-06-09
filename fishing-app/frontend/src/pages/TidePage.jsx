@@ -351,15 +351,15 @@ function TidePage({ location, onLocationChange }) {
             <table className="hourly-table">
               <thead>
                 <tr>
+                  <th className="sticky-date">날짜</th>
                   <th>시간</th>
                   <th>수위</th>
                   <th>변화</th>
-                  <th>만/간 대비</th>
+                  <th>만/간<br/>대비</th>
                   <th>조류</th>
                   <th>바람</th>
-                  <th>파고</th>
                   <th>날씨</th>
-                  <th>천체</th>
+                  <th>일출/일몰</th>
                   <th>만조/간조</th>
                 </tr>
               </thead>
@@ -368,9 +368,8 @@ function TidePage({ location, onLocationChange }) {
                   const prevHeight = idx > 0 ? hourlyData.hourly[idx - 1].height : item.height
                   const change = item.height - prevHeight
                   const changeIcon = change > 0.01 ? '↑' : change < -0.01 ? '↓' : '→'
-                  const timeStr = String(idx).padStart(2, '0') + ':00'
-                  const celestialEvents = celestialMap[idx] || []
-                  const tideInfo = tideMap[idx]
+                  const timeStr = String(item.hour).padStart(2, '0') + ':00'
+                  const tideInfo = tideMap[item.hour]
 
                   // 간조/만조 대비 변화 계산
                   const lowTide = Math.min(...hourlyData.hourly.map(h => h.height))
@@ -378,8 +377,18 @@ function TidePage({ location, onLocationChange }) {
                   const tideRange = highTide - lowTide
                   const tidePercent = tideRange > 0 ? Math.round(((item.height - lowTide) / tideRange) * 100) : 50
 
+                  // 일출/일몰 시간 표시
+                  const isSunrise = item.hour === hourlyData.sunrise
+                  const isSunset = item.hour === hourlyData.sunset
+                  const sunEvent = isSunrise ? '🌅일출' : isSunset ? '🌇일몰' : '-'
+
+                  // 시간대별 배경 그래디언션 (야간/주간)
+                  const isNight = item.hour < hourlyData.sunrise || item.hour >= hourlyData.sunset
+                  const bgClass = isNight ? 'night' : 'day'
+
                   return (
-                    <tr key={idx}>
+                    <tr key={idx} className={bgClass}>
+                      <td className="sticky-date date-cell">{selectedDate.toLocaleDateString('ko-KR', {month: '2-digit', day: '2-digit'})}</td>
                       <td className="time-cell">{timeStr}</td>
                       <td className="height-cell">{item.height.toFixed(2)}m</td>
                       <td className="change-cell">
@@ -402,28 +411,23 @@ function TidePage({ location, onLocationChange }) {
                       <td className="wind-cell">
                         <span className="wind-value">{item.windSpeed.toFixed(1)}m/s</span>
                       </td>
-                      <td className="wave-cell">
-                        <span className="wave-value">{item.waveHeight.toFixed(1)}m</span>
-                      </td>
                       <td className="weather-cell">
                         <span className="weather-icon">{getWeatherIcon(item.weather)}</span>
                         <span className="temp-info">{Math.round(item.temp)}°</span>
                       </td>
-                      <td className="celestial-cell">
-                        {celestialEvents.map((event, eidx) => (
-                          <span key={eidx} className="event-badge">
-                            {event.type === 'sunrise' && '🌅'}
-                            {event.type === 'sunset' && '🌇'}
-                            {event.type === 'moonrise' && '🌙'}
-                            {event.type === 'moonset' && '🌙'}
-                          </span>
-                        ))}
+                      <td className="sun-cell">
+                        {sunEvent}
                       </td>
                       <td className="tide-cell">
-                        {tideInfo && (
-                          <span className={`tide-badge ${tideInfo.type}`}>
-                            {tideInfo.type === 'high' ? '▲' : '▼'}{tideInfo.height.toFixed(2)}m
-                          </span>
+                        {tideInfo ? (
+                          <div className="tide-detail">
+                            <span className={`tide-badge ${tideInfo.type}`}>
+                              {tideInfo.type === 'high' ? '▲만조' : '▼간조'}
+                            </span>
+                            <span className="tide-height">{tideInfo.height.toFixed(2)}m</span>
+                          </div>
+                        ) : (
+                          <span>-</span>
                         )}
                       </td>
                     </tr>
@@ -451,34 +455,39 @@ function TidePage({ location, onLocationChange }) {
                 </tr>
               </thead>
               <tbody>
-                {hourlyData.hourly && hourlyData.hourly.map((item, idx) => (
-                  <tr key={idx}>
-                    <td className="time-cell">
-                      <strong>{String(idx).padStart(2, '0')}시</strong>
-                    </td>
-                    <td className="wind-dir-cell">
-                      <div className="wind-direction">
-                        <span className="arrow" style={{ transform: `rotate(${getWindDegree(item.windDir)}deg)` }}>↓</span>
-                        <div className="dir-text">{item.windDir}</div>
-                      </div>
-                    </td>
-                    <td className="wind-speed-cell">
-                      <div className="current">{item.windSpeed.toFixed(1)}m/s</div>
-                      <div className="max">최대 {(item.windSpeed * 1.6).toFixed(1)}m/s</div>
-                    </td>
-                    <td className="weather-cell">
-                      {getWeatherIcon(item.weather)}
-                    </td>
-                    <td className="temp-cell">
-                      {Math.round(item.temp)}°
-                    </td>
-                    <td className="wave-cell">
-                      <div className="wave-icon">🌊</div>
-                      <div>{item.waveHeight}m</div>
-                      <div className="period">{item.wavePeriod}s</div>
-                    </td>
-                  </tr>
-                ))}
+                {hourlyData.hourly && hourlyData.hourly.map((item, idx) => {
+                  const isNight = item.hour < hourlyData.sunrise || item.hour >= hourlyData.sunset
+                  const bgClass = isNight ? 'night' : 'day'
+
+                  return (
+                    <tr key={idx} className={bgClass}>
+                      <td className="time-cell">
+                        <strong>{String(item.hour).padStart(2, '0')}:00</strong>
+                      </td>
+                      <td className="wind-dir-cell">
+                        <div className="wind-direction">
+                          <span className="arrow" style={{ transform: `rotate(${getWindDegree(item.windDir)}deg)` }}>↓</span>
+                          <div className="dir-text">{item.windDir}</div>
+                        </div>
+                      </td>
+                      <td className="wind-speed-cell">
+                        <div className="current">{item.windSpeed.toFixed(1)}m/s</div>
+                        <div className="max">최대 {(item.windSpeed * 1.6).toFixed(1)}m/s</div>
+                      </td>
+                      <td className="weather-cell">
+                        {getWeatherIcon(item.weather)}
+                      </td>
+                      <td className="temp-cell">
+                        {Math.round(item.temp)}°
+                      </td>
+                      <td className="wave-cell">
+                        <div className="wave-icon">🌊</div>
+                        <div>{item.waveHeight}m</div>
+                        <div className="period">{item.wavePeriod}s</div>
+                      </td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           </div>

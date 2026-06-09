@@ -1013,3 +1013,93 @@
     font-size: 9px;
   }
 }
+
+/* 물때 탭 개선: 고정 헤더, 배경 그래디언션, 날짜 유지 */
+
+/* 고정 헤더 */
+.hourly-table {
+  position: sticky;
+  top: 0;
+  background: white;
+}
+
+.hourly-table thead {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.hourly-table th.sticky-date {
+  position: sticky;
+  left: 0;
+  z-index: 11;
+  background: linear-gradient(135deg, #0066cc, #0052a3);
+  color: white;
+}
+
+/* 날짜 컬럼 고정 */
+.hourly-table .sticky-date {
+  position: sticky;
+  left: 0;
+  z-index: 5;
+  background: inherit;
+  min-width: 60px;
+  text-align: center;
+}
+
+/* 야간/주간 배경 그래디언션 */
+.hourly-table tbody tr.night {
+  background: linear-gradient(to right, #2a2a2a 0%, #1a1a1a 50%, #2a2a2a 100%);
+  color: #e0e0e0;
+}
+
+.hourly-table tbody tr.night td {
+  border-bottom-color: #444;
+}
+
+.hourly-table tbody tr.day {
+  background: linear-gradient(to right, #ffffff 0%, #f9f9f9 50%, #ffffff 100%);
+  color: #333;
+}
+
+.hourly-table tbody tr.night .sticky-date {
+  background: linear-gradient(135deg, #4a4a4a, #3a3a3a);
+}
+
+.hourly-table tbody tr.day .sticky-date {
+  background: linear-gradient(135deg, #f0f0f0, #e8e8e8);
+}
+
+/* 야간 시 텍스트 가시성 개선 */
+.hourly-table tbody tr.night .change-badge,
+.hourly-table tbody tr.night .weather-icon,
+.hourly-table tbody tr.night .tide-badge {
+  color: inherit;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+/* 일출/일몰 표시 */
+.sun-cell {
+  font-size: 12px;
+  font-weight: 600;
+  text-align: center;
+  min-width: 70px;
+}
+
+/* 만조/간조 상세 정보 */
+.tide-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  align-items: center;
+}
+
+.tide-detail .tide-badge {
+  font-size: 11px;
+}
+
+.tide-detail .tide-height {
+  font-size: 11px;
+  font-weight: 600;
+  color: #0066cc;
+}
