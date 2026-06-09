@@ -30,6 +30,13 @@ def create_catch():
             weather_condition=data.get('weather_condition', ''),
             tide_info=data.get('tide_info', ''),
             water_temp=data.get('water_temp'),
+            depth_m=data.get('depth_m'),
+            wind_speed=data.get('wind_speed'),
+            hit_time=data.get('hit_time'),
+            tidal_current=data.get('tidal_current'),
+            tide_number=data.get('tide_number'),
+            water_level=data.get('water_level'),
+            user_nickname=data.get('user_nickname'),
             description=data.get('description', ''),
             photos=data.get('photos', ''),
             is_public=data.get('is_public', False),
@@ -118,5 +125,179 @@ def fetch_feed():
             catches = [c for c in catches if c.get('species') == species]
 
         return jsonify(catches), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 400
+
+@catches_bp.route('/generate-test', methods=['POST'])
+def generate_test_data():
+    """테스트 데이터 생성 - 인천 50개 + 군산 50개"""
+    try:
+        import random
+        from datetime import datetime, timedelta
+
+        # 지역별 설정
+        incheon_species = ['우럭', '광어', '농어', '전갈이']
+        incheon_spots = ['인천 영종대교', '인천 월미도', '인천 팔미도', '인천 선재도', '인천 무의도']
+        incheon_coords = [(37.35, 126.63), (37.27, 126.58), (37.40, 126.70), (37.32, 126.65), (37.38, 126.57)]
+
+        gunsan_species = ['우럭', '광어', '감성돔', '방어']
+        gunsan_spots = ['군산 야미도', '군산 비응도', '군산 선유도', '군산 고군산군도', '군산 어청도']
+        gunsan_coords = [(35.98, 126.62), (36.01, 126.68), (36.03, 126.65), (35.99, 126.72), (36.05, 126.55)]
+
+        rods = ['샤마 6ft', '아부 4ft', '시마노 5ft', '다이와 6ft', '델타 7ft']
+        reels = ['시마노 3000', '다이와 2500', '시마노 4000', '다이와 3000', '아부가르시아 3500']
+        line_weights = ['PE 1.0호', 'PE 1.5호', 'PE 2.0호']
+        leaders = ['나일론 2호', '나일론 3호', '나일론 4호']
+        rig_methods = ['벵디그로', '스핀', '이싱', '볼헤드', '지그헤드']
+        nicknames = ['낚시꾼', '바다사나이', '물때마스터', '조류사냥꾼', '파도여사', '손맛좋은아저씨', '대물사냥꾼']
+
+        created_count = 0
+
+        # 인천 50개 생성
+        for _ in range(50):
+            days_ago = random.randint(0, 30)
+            caught_date = datetime.now() - timedelta(days=days_ago)
+            caught_date = caught_date.replace(hour=random.randint(6, 18), minute=random.randint(0, 59))
+
+            species = random.choice(incheon_species)
+            size_cm = round(random.uniform(28, 50), 1)
+            spot_idx = random.randint(0, len(incheon_spots) - 1)
+            spot_name = incheon_spots[spot_idx]
+            lat, lng = incheon_coords[spot_idx]
+            location_lat = lat + random.uniform(-0.01, 0.01)
+            location_lng = lng + random.uniform(-0.01, 0.01)
+
+            catch_id = add_catch_record(
+                species=species,
+                size_cm=size_cm,
+                spot_name=spot_name,
+                location_lat=location_lat,
+                location_lng=location_lng,
+                rod=random.choice(rods),
+                reel=random.choice(reels),
+                line_weight=random.choice(line_weights),
+                leader=random.choice(leaders),
+                rig_method=random.choice(rig_methods),
+                user_nickname=random.choice(nicknames),
+                tide_number=random.randint(1, 15),
+                water_level=round(random.uniform(1.0, 3.5), 2),
+                tidal_current=round(random.uniform(0.2, 1.0), 2),
+                wind_speed=round(random.uniform(1.0, 8.0), 1),
+                description=f'{spot_name}에서 {species} {size_cm}cm 낚시 성공!',
+                is_public=True,
+                user_id=random.randint(1, 5),
+                caught_at=caught_date.isoformat()
+            )
+            if catch_id:
+                created_count += 1
+
+        # 군산 50개 생성
+        for _ in range(50):
+            days_ago = random.randint(0, 30)
+            caught_date = datetime.now() - timedelta(days=days_ago)
+            caught_date = caught_date.replace(hour=random.randint(6, 18), minute=random.randint(0, 59))
+
+            species = random.choice(gunsan_species)
+            size_cm = round(random.uniform(30, 55), 1)
+            spot_idx = random.randint(0, len(gunsan_spots) - 1)
+            spot_name = gunsan_spots[spot_idx]
+            lat, lng = gunsan_coords[spot_idx]
+            location_lat = lat + random.uniform(-0.01, 0.01)
+            location_lng = lng + random.uniform(-0.01, 0.01)
+
+            catch_id = add_catch_record(
+                species=species,
+                size_cm=size_cm,
+                spot_name=spot_name,
+                location_lat=location_lat,
+                location_lng=location_lng,
+                rod=random.choice(rods),
+                reel=random.choice(reels),
+                line_weight=random.choice(line_weights),
+                leader=random.choice(leaders),
+                rig_method=random.choice(rig_methods),
+                user_nickname=random.choice(nicknames),
+                tide_number=random.randint(1, 15),
+                water_level=round(random.uniform(1.0, 3.5), 2),
+                tidal_current=round(random.uniform(0.2, 1.0), 2),
+                wind_speed=round(random.uniform(1.0, 8.0), 1),
+                description=f'{spot_name}에서 {species} {size_cm}cm 낚시 성공!',
+                is_public=True,
+                user_id=random.randint(1, 5),
+                caught_at=caught_date.isoformat()
+            )
+            if catch_id:
+                created_count += 1
+
+        return jsonify({'message': f'{created_count}개의 테스트 데이터 생성 완료 (인천: 50개, 군산: 50개)'}), 201
+    except Exception as e:
+        return jsonify({'error': str(e)}), 400
+
+@catches_bp.route('/nearby', methods=['GET'])
+def fetch_nearby_catches():
+    """주변 위치의 조과 기록 조회 (거리, 날짜, 어종 기반)"""
+    try:
+        lat = request.args.get('lat', type=float)
+        lng = request.args.get('lng', type=float)
+        distance_km = request.args.get('distance', 10, type=float)
+        sort = request.args.get('sort', 'latest', type=str)
+        date_filter = request.args.get('date', type=str)  # YYYY-MM-DD
+        species_filter = request.args.get('species', type=str)
+
+        if lat is None or lng is None:
+            return jsonify({'error': '위도와 경도가 필요합니다'}), 400
+
+        # 모든 공개 기록 조회
+        catches = get_all_catches(limit=1000)
+        public_catches = [c for c in catches if c.get('is_public')]
+
+        # Haversine 공식으로 거리 계산
+        import math
+        from datetime import datetime
+
+        def haversine_distance(lat1, lon1, lat2, lon2):
+            R = 6371  # 지구 반지름 (km)
+            dlat = math.radians(lat2 - lat1)
+            dlon = math.radians(lon2 - lon1)
+            a = math.sin(dlat/2)**2 + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(dlon/2)**2
+            c = 2 * math.asin(math.sqrt(a))
+            return R * c
+
+        # 필터링 및 거리 계산
+        nearby = []
+        for catch in public_catches:
+            if not catch.get('location_lat') or not catch.get('location_lng'):
+                continue
+
+            dist = haversine_distance(lat, lng, catch['location_lat'], catch['location_lng'])
+            if dist > distance_km:
+                continue
+
+            # 날짜 필터 (시작 날짜가 같은 날짜인지 확인)
+            if date_filter:
+                try:
+                    caught_at = datetime.fromisoformat(catch['caught_at'].replace('Z', '+00:00'))
+                    if caught_at.strftime('%Y-%m-%d') != date_filter:
+                        continue
+                except:
+                    pass
+
+            # 어종 필터
+            if species_filter:
+                if not catch.get('species') or species_filter not in catch['species']:
+                    continue
+
+            catch['distance_km'] = round(dist, 2)
+            nearby.append(catch)
+
+        # 소팅
+        if sort == 'views':
+            nearby.sort(key=lambda x: x.get('view_count', 0), reverse=True)
+        elif sort == 'species':
+            nearby.sort(key=lambda x: x.get('species', ''))
+        else:  # latest or distance (거리순)
+            nearby.sort(key=lambda x: x.get('distance_km', 0))
+
+        return jsonify(nearby), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 400

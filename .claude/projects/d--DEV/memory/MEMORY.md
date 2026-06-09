@@ -1,0 +1,4 @@
+- [코드 변경 시 한국어 설명](feedback_korean_explanations.md) — 코드 변경 이유를 한국어 한 줄로 설명
+- [낚시 정보 앱](project_fishing_app.md) — React + Python 백엔드, MVP부터 시작
+- [Phase 4 물때 개선](project_fishing_app_updates.md) — TidePage 재설계, 동적 만조/간조 시간, 지도 조석 정보
+- [낚시앱 재설계 2026](project_fishing_app_redesign.md) — 상단 탭 네비게이션(물때/탐색/기록), 피딩타임 API, 조과 기록

@@ -39,6 +39,18 @@ def init_db():
     except:
         pass
 
+    # catch_records 테이블에 추가 필드 추가
+    try:
+        cursor.execute('ALTER TABLE catch_records ADD COLUMN depth_m REAL')
+        cursor.execute('ALTER TABLE catch_records ADD COLUMN wind_speed REAL')
+        cursor.execute('ALTER TABLE catch_records ADD COLUMN hit_time TIMESTAMP')
+        cursor.execute('ALTER TABLE catch_records ADD COLUMN tidal_current REAL')
+        cursor.execute('ALTER TABLE catch_records ADD COLUMN tide_number INTEGER')
+        cursor.execute('ALTER TABLE catch_records ADD COLUMN water_level REAL')
+        cursor.execute('ALTER TABLE catch_records ADD COLUMN user_nickname TEXT')
+    except:
+        pass
+
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS known_spots (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -271,6 +283,8 @@ def add_catch_record(species, size_cm=None, weight_g=None, spot_id=None, spot_na
                      location_lat=None, location_lng=None, gps_accuracy=None,
                      rod='', reel='', line_weight='', leader='', rig_method='',
                      caught_at=None, weather_condition='', tide_info='', water_temp=None,
+                     depth_m=None, wind_speed=None, hit_time=None, tidal_current=None,
+                     tide_number=None, water_level=None, user_nickname=None,
                      description='', photos='', is_public=False, user_id=None):
     """조과 기록 추가"""
     conn = get_connection()
@@ -283,10 +297,12 @@ def add_catch_record(species, size_cm=None, weight_g=None, spot_id=None, spot_na
         INSERT INTO catch_records
         (user_id, species, size_cm, weight_g, spot_id, spot_name, location_lat, location_lng, gps_accuracy,
          rod, reel, line_weight, leader, rig_method, caught_at, weather_condition, tide_info, water_temp,
+         depth_m, wind_speed, tidal_current, tide_number, water_level, user_nickname,
          description, photos, is_public)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ''', (user_id, species, size_cm, weight_g, spot_id, spot_name, location_lat, location_lng, gps_accuracy,
           rod, reel, line_weight, leader, rig_method, caught_at, weather_condition, tide_info, water_temp,
+          depth_m, wind_speed, tidal_current, tide_number, water_level, user_nickname,
           description, photos, is_public))
 
     conn.commit()

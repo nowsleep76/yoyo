@@ -37,9 +37,16 @@ function App() {
   return (
     <div className="app">
       <Navbar currentPage={currentPage} onPageChange={setCurrentPage} />
+      <div className="location-header">
+        <div className="location-info">
+          <i className="fas fa-map-marker-alt"></i>
+          <span className="location-name">{location.name}</span>
+          <span className="location-coords">({location.latitude.toFixed(4)}, {location.longitude.toFixed(4)})</span>
+        </div>
+      </div>
       <main className="main-content">
         {currentPage === 'tide' && <TidePage location={location} onLocationChange={handleLocationChange} />}
-        {currentPage === 'explore' && <ExplorePage location={location} />}
+        {currentPage === 'explore' && <ExplorePage location={location} onLocationChange={handleLocationChange} />}
         {currentPage === 'records' && <RecordsPage location={location} />}
       </main>
     </div>

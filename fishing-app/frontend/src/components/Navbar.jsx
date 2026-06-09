@@ -6,7 +6,7 @@ function Navbar({ currentPage, onPageChange }) {
       <div className="navbar-container">
         <div className="navbar-brand">
           <i className="fas fa-water"></i>
-          <span className="brand-text">낚시 정보</span>
+          <span className="brand-text">광어와복어</span>
         </div>
         <div className="navbar-tabs">
           <button

@@ -11,13 +11,13 @@ function TidePage({ location, onLocationChange }) {
   const [showLocationSelector, setShowLocationSelector] = useState(false)
   const [selectedRegion, setSelectedRegion] = useState(null)
   const [spots, setSpots] = useState([])
-  const [activeTab, setActiveTab] = useState('tide')
   const [displayLocation, setDisplayLocation] = useState(location)
+  const [activeTab, setActiveTab] = useState('tide')
 
   const mapRef = useRef(null)
   const mapInstanceRef = useRef(null)
 
-  // 위치 정보 로드 (localStorage에서)
+  // 위치 정보 로드
   useEffect(() => {
     const savedLocation = localStorage.getItem('selectedLocation')
     if (savedLocation) {
@@ -36,7 +36,6 @@ function TidePage({ location, onLocationChange }) {
     }
   }, [])
 
-  // 위치가 변경되면 업데이트
   useEffect(() => {
     if (location && location.latitude && location.longitude) {
       setDisplayLocation(location)
@@ -53,7 +52,6 @@ function TidePage({ location, onLocationChange }) {
           setSpots(data || [])
         }
       } catch (err) {
-        console.error('명소 로드 실패:', err)
         setSpots([
           { id: 1, name: '부산 해운대', region: '남해', latitude: 35.1595, longitude: 129.1603, fish_types: '우럭, 감성돔' },
           { id: 2, name: '울산 방어', region: '남해', latitude: 35.2872, longitude: 129.3719, fish_types: '방어, 우럭' },
@@ -99,12 +97,9 @@ function TidePage({ location, onLocationChange }) {
         const data = await response.json()
         if (data && data.hourly) {
           setHourlyData(data)
-        } else {
-          setHourlyData(generateTestData(selectedDate))
         }
       } catch (err) {
         console.error('데이터 로드 실패:', err)
-        setHourlyData(generateTestData(selectedDate))
       } finally {
         setLoading(false)
       }
@@ -164,7 +159,7 @@ function TidePage({ location, onLocationChange }) {
     }
   }, [displayLocation])
 
-  if (!hourlyData && loading) {
+  if (loading || !hourlyData) {
     return <div className="tide-page loading">로딩 중...</div>
   }
 
@@ -178,6 +173,48 @@ function TidePage({ location, onLocationChange }) {
     day: 'numeric',
     weekday: 'long'
   })
+
+  // 음력 계산
+  const calculateLunarDate = (date) => {
+    const referenceNewMoon = new Date(2000, 0, 6) // 2000년 1월 6일 새월
+    const daysDiff = Math.floor((date - referenceNewMoon) / (86400000))
+    const lunarCycle = daysDiff % (29.5 * 12) // 음력 연도 주기 (29.5일 * 12개월)
+    const lunarMonth = Math.floor(lunarCycle / 29.5) + 1
+    const lunarDay = Math.round(lunarCycle % 29.5) + 1
+
+    return {
+      month: lunarMonth > 12 ? lunarMonth - 12 : lunarMonth,
+      day: lunarDay > 29 ? 29 : lunarDay
+    }
+  }
+
+  const lunarDate = calculateLunarDate(selectedDate)
+
+  // 천체 이벤트 맵
+  const celestialMap = {}
+  if (hourlyData.celestialEvents) {
+    hourlyData.celestialEvents.forEach(event => {
+      if (!celestialMap[event.hour]) {
+        celestialMap[event.hour] = []
+      }
+      celestialMap[event.hour].push(event)
+    })
+  }
+
+  // 만조/간조 맵
+  const tideMap = {}
+  if (hourlyData.highTides) {
+    hourlyData.highTides.forEach(tide => {
+      const [h] = tide.time.split(':').map(Number)
+      tideMap[h] = { type: 'high', ...tide }
+    })
+  }
+  if (hourlyData.lowTides) {
+    hourlyData.lowTides.forEach(tide => {
+      const [h] = tide.time.split(':').map(Number)
+      tideMap[h] = { type: 'low', ...tide }
+    })
+  }
 
   return (
     <div className="tide-page">
@@ -252,22 +289,6 @@ function TidePage({ location, onLocationChange }) {
         </div>
       )}
 
-      {/* 탭 네비게이션 */}
-      <div className="tab-navigation">
-        <button
-          className={`tab-btn ${activeTab === 'tide' ? 'active' : ''}`}
-          onClick={() => setActiveTab('tide')}
-        >
-          물때
-        </button>
-        <button
-          className={`tab-btn ${activeTab === 'wind' ? 'active' : ''}`}
-          onClick={() => setActiveTab('wind')}
-        >
-          바람/파고
-        </button>
-      </div>
-
       {/* 날짜 선택 */}
       <div className="date-selector">
         <div className="date-info">{dateStr}</div>
@@ -292,68 +313,133 @@ function TidePage({ location, onLocationChange }) {
         </div>
       </div>
 
+      {/* 물때 정보 헤더 */}
+      <div className="tide-info-header">
+        <div className="info-item">
+          <span className="info-label">물때 번호</span>
+          <span className="info-value">{hourlyData.tideNumber}물</span>
+        </div>
+        <div className="info-item">
+          <span className="info-label">음력</span>
+          <span className="info-value">{lunarDate.month}월 {lunarDate.day}일</span>
+        </div>
+        <div className="info-item">
+          <span className="info-label">조류</span>
+          <span className="info-value">{hourlyData.volume?.label || '중간'}</span>
+        </div>
+      </div>
+
+      {/* 탭 네비게이션 */}
+      <div className="tab-navigation">
+        <button
+          className={`tab-btn ${activeTab === 'tide' ? 'active' : ''}`}
+          onClick={() => setActiveTab('tide')}
+        >
+          물때
+        </button>
+        <button
+          className={`tab-btn ${activeTab === 'wind' ? 'active' : ''}`}
+          onClick={() => setActiveTab('wind')}
+        >
+          바람/파고
+        </button>
+      </div>
+
       {/* 물때 탭 */}
-      {activeTab === 'tide' && hourlyData && (
-        <div className="tide-content">
-          <div className="tide-wrapper">
-            {/* 왼쪽: 시간축 */}
-            <div className="tide-time-axis">
-              {[0, 3, 6, 9, 12, 15, 18, 21, 24].map((hour) => (
-                <div key={hour} className="tide-hour">
-                  {String(hour).padStart(2, '0')}:00
-                </div>
-              ))}
-            </div>
+      {activeTab === 'tide' && (
+        <div className="tide-content-wrapper">
+          {/* 1시간 단위 테이블 */}
+          <div className="hourly-table-container">
+            <table className="hourly-table">
+              <thead>
+                <tr>
+                  <th>시간</th>
+                  <th>수위</th>
+                  <th>변화</th>
+                  <th>만/간 대비</th>
+                  <th>조류</th>
+                  <th>바람</th>
+                  <th>파고</th>
+                  <th>날씨</th>
+                  <th>천체</th>
+                  <th>만조/간조</th>
+                </tr>
+              </thead>
+              <tbody>
+                {hourlyData.hourly && hourlyData.hourly.map((item, idx) => {
+                  const prevHeight = idx > 0 ? hourlyData.hourly[idx - 1].height : item.height
+                  const change = item.height - prevHeight
+                  const changeIcon = change > 0.01 ? '↑' : change < -0.01 ? '↓' : '→'
+                  const timeStr = String(idx).padStart(2, '0') + ':00'
+                  const celestialEvents = celestialMap[idx] || []
+                  const tideInfo = tideMap[idx]
 
-            {/* 중앙: 타임라인 */}
-            <div className="tide-timeline">
-              {/* 만조 마커 */}
-              {hourlyData.highTides && hourlyData.highTides.map((tide, idx) => {
-                const [h, m] = tide.time.split(':').map(Number)
-                const percent = ((h * 60 + m) / 1440) * 100
-                return (
-                  <div key={`high-${idx}`} className="tide-marker high" style={{ top: `${percent}%` }}>
-                    <div className="marker-box">
-                      <div className="marker-title">만조 {tide.time}</div>
-                      <div className="marker-value">({tide.height}m) ▲ {tide.change}</div>
-                    </div>
-                  </div>
-                )
-              })}
+                  // 간조/만조 대비 변화 계산
+                  const lowTide = Math.min(...hourlyData.hourly.map(h => h.height))
+                  const highTide = Math.max(...hourlyData.hourly.map(h => h.height))
+                  const tideRange = highTide - lowTide
+                  const tidePercent = tideRange > 0 ? Math.round(((item.height - lowTide) / tideRange) * 100) : 50
 
-              {/* 간조 마커 */}
-              {hourlyData.lowTides && hourlyData.lowTides.map((tide, idx) => {
-                const [h, m] = tide.time.split(':').map(Number)
-                const percent = ((h * 60 + m) / 1440) * 100
-                return (
-                  <div key={`low-${idx}`} className="tide-marker low" style={{ top: `${percent}%` }}>
-                    <div className="marker-box">
-                      <div className="marker-title">간조 {tide.time}</div>
-                      <div className="marker-value">({tide.height}m) ▼ {Math.abs(tide.change)}</div>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-
-            {/* 오른쪽: 시간별 날씨 */}
-            <div className="tide-weather">
-              {hourlyData.hourly && hourlyData.hourly.map((item, idx) => (
-                <div key={idx} className="weather-cell">
-                  <div className="weather-hour">{String(idx).padStart(2, '0')}</div>
-                  <div className="weather-icon">{getWeatherIcon(item.weather)}</div>
-                  <div className="weather-temp">{Math.round(item.temp)}°</div>
-                  <div className="weather-wind">{item.windSpeed.toFixed(1)}</div>
-                </div>
-              ))}
-            </div>
+                  return (
+                    <tr key={idx}>
+                      <td className="time-cell">{timeStr}</td>
+                      <td className="height-cell">{item.height.toFixed(2)}m</td>
+                      <td className="change-cell">
+                        <span className={`change-badge ${change > 0 ? 'up' : change < 0 ? 'down' : 'flat'}`}>
+                          {changeIcon}{Math.abs(change).toFixed(2)}
+                        </span>
+                      </td>
+                      <td className="tide-range-cell">
+                        <div className="tide-bar-container">
+                          <div className="tide-bar" style={{ width: `${tidePercent}%` }}></div>
+                          <span className="tide-percent">{tidePercent}%</span>
+                        </div>
+                      </td>
+                      <td className="current-cell">
+                        <div className="current-bar-container">
+                          <div className="current-bar" style={{ width: `${(item.currentSpeed / Math.max(...hourlyData.hourly.map(h => h.currentSpeed))) * 100}%` }}></div>
+                          <span className="current-value">{item.currentSpeed.toFixed(2)}</span>
+                        </div>
+                      </td>
+                      <td className="wind-cell">
+                        <span className="wind-value">{item.windSpeed.toFixed(1)}m/s</span>
+                      </td>
+                      <td className="wave-cell">
+                        <span className="wave-value">{item.waveHeight.toFixed(1)}m</span>
+                      </td>
+                      <td className="weather-cell">
+                        <span className="weather-icon">{getWeatherIcon(item.weather)}</span>
+                        <span className="temp-info">{Math.round(item.temp)}°</span>
+                      </td>
+                      <td className="celestial-cell">
+                        {celestialEvents.map((event, eidx) => (
+                          <span key={eidx} className="event-badge">
+                            {event.type === 'sunrise' && '🌅'}
+                            {event.type === 'sunset' && '🌇'}
+                            {event.type === 'moonrise' && '🌙'}
+                            {event.type === 'moonset' && '🌙'}
+                          </span>
+                        ))}
+                      </td>
+                      <td className="tide-cell">
+                        {tideInfo && (
+                          <span className={`tide-badge ${tideInfo.type}`}>
+                            {tideInfo.type === 'high' ? '▲' : '▼'}{tideInfo.height.toFixed(2)}m
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
           </div>
         </div>
       )}
 
       {/* 바람/파고 탭 */}
       {activeTab === 'wind' && hourlyData && (
-        <div className="wind-content">
+        <div className="wind-content-wrapper">
           <div className="wind-table-wrapper">
             <table className="wind-table">
               <thead>
@@ -363,7 +449,7 @@ function TidePage({ location, onLocationChange }) {
                   <th>풍속</th>
                   <th>날씨</th>
                   <th>기온</th>
-                  <th>파향/파고/주기</th>
+                  <th>파고</th>
                 </tr>
               </thead>
               <tbody>
@@ -400,65 +486,8 @@ function TidePage({ location, onLocationChange }) {
           </div>
         </div>
       )}
-
-      {/* 지도 */}
-      <div className="map-section">
-        <div ref={mapRef} className="tide-map"></div>
-      </div>
     </div>
   )
-}
-
-// 테스트 데이터 생성
-function generateTestData(date) {
-  const hourly = []
-
-  for (let h = 0; h < 24; h++) {
-    const sine = Math.sin((h / 24) * Math.PI * 2)
-    const cosine = Math.cos((h / 24) * Math.PI * 2)
-    const height = 1.2 + sine * 0.8
-
-    hourly.push({
-      hour: h,
-      height: parseFloat(height.toFixed(2)),
-      weather: h < 6 ? '맑음' : h < 12 ? '구름' : h < 18 ? '맑음' : '구름',
-      temp: 15 + sine * 6,
-      windSpeed: 2.5 + cosine * 2.5,
-      windDir: getWindDirectionFromDegree(h * 15),
-      waterTemp: 18,
-      waveHeight: (0.4 + Math.abs(cosine) * 0.5).toFixed(1),
-      wavePeriod: 3
-    })
-  }
-
-  const highTides = [
-    { time: '05:30', height: 2.1, change: 520 },
-    { time: '17:50', height: 2.0, change: 510 }
-  ]
-
-  const lowTides = [
-    { time: '11:10', height: 0.2, change: 510 },
-    { time: '23:40', height: 0.3, change: 500 }
-  ]
-
-  return { hourly, highTides, lowTides }
-}
-
-function getWindDirectionFromDegree(degree) {
-  const directions = ['북', '북북동', '북동', '동북동', '동', '동남동', '남동', '남남동',
-                      '남', '남남서', '남서', '서남서', '서', '서북서', '북서', '북북서']
-  const idx = Math.round((degree % 360) / 22.5) % 16
-  return directions[idx]
-}
-
-function getWindDegree(direction) {
-  const map = {
-    '북': 0, '북북동': 22.5, '북동': 45, '동북동': 67.5,
-    '동': 90, '동남동': 112.5, '남동': 135, '남남동': 157.5,
-    '남': 180, '남남서': 202.5, '남서': 225, '서남서': 247.5,
-    '서': 270, '서북서': 292.5, '북서': 315, '북북서': 337.5
-  }
-  return map[direction] || 0
 }
 
 function getWeatherIcon(weather) {
@@ -470,6 +499,16 @@ function getWeatherIcon(weather) {
     '눈': '❄️'
   }
   return icons[weather] || '☀️'
+}
+
+function getWindDegree(direction) {
+  const map = {
+    '북': 0, '북북동': 22.5, '북동': 45, '동북동': 67.5,
+    '동': 90, '동남동': 112.5, '남동': 135, '남남동': 157.5,
+    '남': 180, '남남서': 202.5, '남서': 225, '서남서': 247.5,
+    '서': 270, '서북서': 292.5, '북서': 315, '북북서': 337.5
+  }
+  return map[direction] || 0
 }
 
 export default TidePage

@@ -67,6 +67,37 @@ def get_tide_data(latitude, longitude):
         'timestamp': datetime.now().isoformat()
     }
 
+def get_celestial_times(date, latitude):
+    """일출, 일몰, 월출, 월몰 시간 계산 (근사값)"""
+    month = date.month
+    day = date.day
+
+    # 위도에 따른 일출/일몰 시간 (한국 기준 근사값)
+    if month in [12, 1, 2]:  # 겨울
+        sunrise = 7
+        sunset = 17
+    elif month in [3, 4, 5]:  # 봄
+        sunrise = 6
+        sunset = 18
+    elif month in [6, 7, 8]:  # 여름
+        sunrise = 5
+        sunset = 19
+    else:  # 가을
+        sunrise = 6
+        sunset = 18
+
+    # 월출/월몰 (6시간 단위 변동)
+    day_of_month_cycle = day % 29
+    moon_rise = (5 + (day_of_month_cycle // 2)) % 24
+    moon_set = (17 + (day_of_month_cycle // 2)) % 24
+
+    return {
+        'sunrise': sunrise,
+        'sunset': sunset,
+        'moonrise': moon_rise,
+        'moonset': moon_set
+    }
+
 def get_tide_hourly(latitude, longitude, date_str=None):
     """날짜별 24시간 조석 높이 + 수온 + 만조/간조 계산"""
     reference_new_moon = datetime(2000, 1, 6)
@@ -80,6 +111,9 @@ def get_tide_hourly(latitude, longitude, date_str=None):
     lunar_age = (days_since % 29.5) + 1
     tide_num = int((lunar_age / 29.5) * 15) + 1
     tide_num = min(15, max(1, tide_num))
+
+    # 천체 데이터 계산
+    celestial = get_celestial_times(target, latitude)
 
     amplitude = 1.0 + (tide_num / 15) * 1.2
 
@@ -192,6 +226,14 @@ def get_tide_hourly(latitude, longitude, date_str=None):
     high_tides_camel = [{'time': f"{t['hour']:02d}:00", 'height': t['height'], 'change': int(height * 100)} for t in high_tides]
     low_tides_camel = [{'time': f"{t['hour']:02d}:00", 'height': t['height'], 'change': int(height * 100)} for t in low_tides]
 
+    # 천체 데이터
+    celestial_events = [
+        {'type': 'sunrise', 'hour': celestial['sunrise'], 'label': '일출'},
+        {'type': 'moonrise', 'hour': celestial['moonrise'], 'label': '월출'},
+        {'type': 'sunset', 'hour': celestial['sunset'], 'label': '일몰'},
+        {'type': 'moonset', 'hour': celestial['moonset'], 'label': '월몰'},
+    ]
+
     return {
         'date': target.strftime('%Y-%m-%d'),
         'weekday': ['월','화','수','목','금','토','일'][target.weekday()],
@@ -201,6 +243,7 @@ def get_tide_hourly(latitude, longitude, date_str=None):
         'hourly': hourly,
         'highTides': high_tides_camel,
         'lowTides': low_tides_camel,
+        'celestialEvents': celestial_events,
         'location': {
             'latitude': latitude,
             'longitude': longitude
