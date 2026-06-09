@@ -188,22 +188,41 @@ function TidePage({ location, onLocationChange }) {
     })
   }
 
-  // 만조/간조 맵
-  const tideMap = {}
+  // 모든 만조/간조 데이터 통합 (시간순 정렬)
+  const allTides = []
   if (hourlyData?.highTides) {
     hourlyData.highTides.forEach(tide => {
-      const [h] = (tide.time || '').split(':').map(Number)
-      if (!isNaN(h)) {
-        tideMap[h] = { type: 'high', ...tide }
-      }
+      allTides.push({ type: 'high', ...tide })
     })
   }
   if (hourlyData?.lowTides) {
     hourlyData.lowTides.forEach(tide => {
-      const [h] = (tide.time || '').split(':').map(Number)
-      if (!isNaN(h)) {
-        tideMap[h] = { type: 'low', ...tide }
-      }
+      allTides.push({ type: 'low', ...tide })
+    })
+  }
+
+  // 시간순 정렬
+  allTides.sort((a, b) => {
+    const aTime = parseInt(a.time.split(':')[0]) * 60 + parseInt(a.time.split(':')[1])
+    const bTime = parseInt(b.time.split(':')[0]) * 60 + parseInt(b.time.split(':')[1])
+    return aTime - bTime
+  })
+
+  // 각 극값에 대해 직전 극값과의 수위 변화 계산
+  allTides.forEach((tide, idx) => {
+    if (idx > 0) {
+      const prevTide = allTides[idx - 1]
+      tide.heightChange = tide.height - prevTide.height
+    } else {
+      tide.heightChange = 0
+    }
+  })
+
+  // 시간대별 근접 극값 맵 (범위: 1.5시간 전후)
+  const getNearestTide = (hour) => {
+    return allTides.find(t => {
+      const tideHour = parseInt(t.time.split(':')[0])
+      return hour <= tideHour && tideHour < hour + 3
     })
   }
 
@@ -369,17 +388,22 @@ function TidePage({ location, onLocationChange }) {
                   const tideRange = highTide - lowTide
                   const tidePercent = tideRange > 0 ? Math.round(((item.height - lowTide) / tideRange) * 100) : 50
 
-                  // 일출/일몰 시간 표시 - 정확히 맞거나 근처 시간대일 때 표시
-                  const sunriseHour = hourlyData.sunrise
-                  const sunsetHour = hourlyData.sunset
+                  // 일출/일몰 시간 표시 (문자열로 받음)
+                  const sunriseTime = hourlyData.sunrise // "05:35" 형식
+                  const sunsetTime = hourlyData.sunset // "19:39" 형식
+                  const sunriseHour = parseInt(sunriseTime.split(':')[0])
+                  const sunsetHour = parseInt(sunsetTime.split(':')[0])
                   const isSunriseNear = item.hour <= sunriseHour && sunriseHour < item.hour + 3
                   const isSunsetNear = item.hour <= sunsetHour && sunsetHour < item.hour + 3
-                  const sunEvent = isSunriseNear ? `🌅 ${String(sunriseHour).padStart(2, '0')}:00` :
-                                   isSunsetNear ? `🌇 ${String(sunsetHour).padStart(2, '0')}:00` : '-'
+                  const sunEvent = isSunriseNear ? `🌅 ${sunriseTime}` :
+                                   isSunsetNear ? `🌇 ${sunsetTime}` : '-'
 
                   // 시간대별 배경 그래디언션 (야간/주간)
-                  const isNight = item.hour < hourlyData.sunrise || item.hour >= hourlyData.sunset
+                  const isNight = item.hour < sunriseHour || item.hour >= sunsetHour
                   const bgClass = isNight ? 'night' : 'day'
+
+                  // 근접 극값 찾기
+                  const nearestTide = getNearestTide(item.hour)
 
                   return (
                     <tr key={idx} className={bgClass}>
@@ -413,14 +437,19 @@ function TidePage({ location, onLocationChange }) {
                         {sunEvent}
                       </td>
                       <td className="tide-cell">
-                        {tideInfo ? (
-                          <div className={`tide-detail tide-${tideInfo.type}`}>
-                            <span className={`tide-label ${tideInfo.type}`}>
-                              {tideInfo.type === 'high' ? '🔺만조' : '🔻간조'}
+                        {nearestTide ? (
+                          <div className={`tide-detail tide-${nearestTide.type}`}>
+                            <span className={`tide-label ${nearestTide.type}`}>
+                              {nearestTide.type === 'high' ? '🔺만조' : '🔻간조'}
                             </span>
-                            <span className="tide-time">{tideInfo.time}</span>
+                            <span className="tide-time">{nearestTide.time}</span>
                             <span className="tide-info">
-                              {tideInfo.height.toFixed(2)}m {tideInfo.change > 0 ? `(+${tideInfo.change}%)` : `(${tideInfo.change}%)`}
+                              {nearestTide.height.toFixed(2)}m
+                              {nearestTide.heightChange !== 0 && (
+                                <span className={nearestTide.heightChange > 0 ? 'up' : 'down'}>
+                                  {nearestTide.heightChange > 0 ? '+' : ''}{nearestTide.heightChange.toFixed(2)}m
+                                </span>
+                              )}
                             </span>
                           </div>
                         ) : (
@@ -453,7 +482,9 @@ function TidePage({ location, onLocationChange }) {
               </thead>
               <tbody>
                 {hourlyData.hourly && hourlyData.hourly.map((item, idx) => {
-                  const isNight = item.hour < hourlyData.sunrise || item.hour >= hourlyData.sunset
+                  const sunriseHour = parseInt(hourlyData.sunrise.split(':')[0])
+                  const sunsetHour = parseInt(hourlyData.sunset.split(':')[0])
+                  const isNight = item.hour < sunriseHour || item.hour >= sunsetHour
                   const bgClass = isNight ? 'night' : 'day'
 
                   return (

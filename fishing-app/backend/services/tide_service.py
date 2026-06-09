@@ -74,28 +74,28 @@ def get_celestial_times(date, latitude):
 
     # 위도에 따른 일출/일몰 시간 (한국 기준 근사값)
     if month in [12, 1, 2]:  # 겨울
-        sunrise = 7
-        sunset = 17
+        sunrise_hour, sunrise_min = 7, 15
+        sunset_hour, sunset_min = 17, 20
     elif month in [3, 4, 5]:  # 봄
-        sunrise = 6
-        sunset = 18
+        sunrise_hour, sunrise_min = 6, 10
+        sunset_hour, sunset_min = 18, 45
     elif month in [6, 7, 8]:  # 여름
-        sunrise = 5
-        sunset = 19
+        sunrise_hour, sunrise_min = 5, 20
+        sunset_hour, sunset_min = 19, 30
     else:  # 가을
-        sunrise = 6
-        sunset = 18
+        sunrise_hour, sunrise_min = 6, 20
+        sunset_hour, sunset_min = 18, 10
 
-    # 월출/월몰 (6시간 단위 변동)
-    day_of_month_cycle = day % 29
-    moon_rise = (5 + (day_of_month_cycle // 2)) % 24
-    moon_set = (17 + (day_of_month_cycle // 2)) % 24
+    # 날짜에 따른 미세 조정
+    day_adjustment = (day % 15) // 3
+    sunrise_min = (sunrise_min + day_adjustment * 5) % 60
+    sunset_min = (sunset_min + day_adjustment * 3) % 60
 
     return {
-        'sunrise': sunrise,
-        'sunset': sunset,
-        'moonrise': moon_rise,
-        'moonset': moon_set
+        'sunrise': sunrise_hour,
+        'sunrise_minute': sunrise_min,
+        'sunset': sunset_hour,
+        'sunset_minute': sunset_min
     }
 
 def get_lunar_date(target_date):
@@ -219,29 +219,43 @@ def get_tide_hourly(latitude, longitude, date_str=None):
         # 2차 미분: (다음값 - 현재값) - (현재값 - 이전값)
         second_deriv = (next_h - curr_h) - (curr_h - prev_h)
 
+        # 극값 시점의 분을 계산 (선형 보간)
+        if prev_h != curr_h:
+            # 극값이 i-1과 i 사이에 있으면 분을 계산
+            if (curr_h > prev_h and second_deriv < -0.01) or (curr_h < prev_h and second_deriv > 0.01):
+                # 비율로 분을 계산 (0~59)
+                ratio = abs(curr_h - prev_h) / (abs(next_h - prev_h) + 0.001)
+                minute = int(ratio * 60) if ratio < 1 else 30
+            else:
+                minute = 30
+        else:
+            minute = 0
+
         # 만조: 2차 미분 < 0 (아래로 볼록)
         if second_deriv < -0.05:
             # 6시간 이상 떨어져 있으면 추가
             if not any(abs(t['hour'] - i) < 6 for t in high_tides):
-                high_tides.append({'hour': i, 'height': round(curr_h, 2), 'label': f'{i:02d}:00'})
+                time_str = f'{i:02d}:{minute:02d}'
+                high_tides.append({'hour': i, 'minute': minute, 'time': time_str, 'height': round(curr_h, 2)})
 
         # 간조: 2차 미분 > 0 (위로 볼록)
         elif second_deriv > 0.05:
             # 6시간 이상 떨어져 있으면 추가
             if not any(abs(t['hour'] - i) < 6 for t in low_tides):
-                low_tides.append({'hour': i, 'height': round(curr_h, 2), 'label': f'{i:02d}:00'})
+                time_str = f'{i:02d}:{minute:02d}'
+                low_tides.append({'hour': i, 'minute': minute, 'time': time_str, 'height': round(curr_h, 2)})
 
     # 간조가 없으면 최소값을 간조로 추가
     if not low_tides and len(hourly) > 0:
         min_hour = hourly.index(min(hourly, key=lambda x: x['height']))
         min_height = hourly[min_hour]['height']
-        low_tides.append({'hour': min_hour, 'height': round(min_height, 2), 'label': f'{min_hour:02d}:00'})
+        low_tides.append({'hour': min_hour, 'minute': 0, 'time': f'{min_hour:02d}:00', 'height': round(min_height, 2)})
 
     # 만조가 없으면 최대값을 만조로 추가
     if not high_tides and len(hourly) > 0:
         max_hour = hourly.index(max(hourly, key=lambda x: x['height']))
         max_height = hourly[max_hour]['height']
-        high_tides.append({'hour': max_hour, 'height': round(max_height, 2), 'label': f'{max_hour:02d}:00'})
+        high_tides.append({'hour': max_hour, 'minute': 0, 'time': f'{max_hour:02d}:00', 'height': round(max_height, 2)})
 
     # 3시간 단위 데이터 필터링
     hourly_3h = [h for h in hourly if h['hour'] % 3 == 0]
@@ -249,8 +263,8 @@ def get_tide_hourly(latitude, longitude, date_str=None):
     volume = get_tide_volume(tide_num)
 
     # highTides, lowTides 형식 변환 (camelCase, time 필드 추가)
-    high_tides_camel = [{'time': f"{t['hour']:02d}:00", 'height': t['height'], 'change': int(height * 100)} for t in high_tides]
-    low_tides_camel = [{'time': f"{t['hour']:02d}:00", 'height': t['height'], 'change': int(height * 100)} for t in low_tides]
+    high_tides_camel = [{'time': t['time'], 'height': t['height']} for t in high_tides]
+    low_tides_camel = [{'time': t['time'], 'height': t['height']} for t in low_tides]
 
     # 천체 데이터
     celestial_events = [
@@ -269,8 +283,8 @@ def get_tide_hourly(latitude, longitude, date_str=None):
             'day': lunar_info['day'],
             'age': lunar_info['age']
         },
-        'sunrise': celestial['sunrise'],
-        'sunset': celestial['sunset'],
+        'sunrise': f"{celestial['sunrise']:02d}:{celestial['sunrise_minute']:02d}",
+        'sunset': f"{celestial['sunset']:02d}:{celestial['sunset_minute']:02d}",
         'hourly': hourly_3h,  # 3시간 단위 데이터
         'highTides': high_tides_camel,
         'lowTides': low_tides_camel,
