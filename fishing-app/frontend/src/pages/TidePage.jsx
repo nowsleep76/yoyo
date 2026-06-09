@@ -369,11 +369,13 @@ function TidePage({ location, onLocationChange }) {
                   const tideRange = highTide - lowTide
                   const tidePercent = tideRange > 0 ? Math.round(((item.height - lowTide) / tideRange) * 100) : 50
 
-                  // 일출/일몰 시간 표시 (HH:MM 형식)
-                  const isSunrise = item.hour === hourlyData.sunrise
-                  const isSunset = item.hour === hourlyData.sunset
-                  const sunEvent = isSunrise ? `일출 ${String(hourlyData.sunrise).padStart(2, '0')}:00` :
-                                   isSunset ? `일몰 ${String(hourlyData.sunset).padStart(2, '0')}:00` : '-'
+                  // 일출/일몰 시간 표시 - 정확히 맞거나 근처 시간대일 때 표시
+                  const sunriseHour = hourlyData.sunrise
+                  const sunsetHour = hourlyData.sunset
+                  const isSunriseNear = item.hour <= sunriseHour && sunriseHour < item.hour + 3
+                  const isSunsetNear = item.hour <= sunsetHour && sunsetHour < item.hour + 3
+                  const sunEvent = isSunriseNear ? `🌅 ${String(sunriseHour).padStart(2, '0')}:00` :
+                                   isSunsetNear ? `🌇 ${String(sunsetHour).padStart(2, '0')}:00` : '-'
 
                   // 시간대별 배경 그래디언션 (야간/주간)
                   const isNight = item.hour < hourlyData.sunrise || item.hour >= hourlyData.sunset
@@ -412,11 +414,14 @@ function TidePage({ location, onLocationChange }) {
                       </td>
                       <td className="tide-cell">
                         {tideInfo ? (
-                          <div className="tide-detail">
-                            <span className={`tide-badge ${tideInfo.type}`}>
-                              {tideInfo.type === 'high' ? '만조' : '간조'} {String(tideInfo.hour).padStart(2, '0')}:{String(tideInfo.time?.split(':')[1] || '00').padStart(2, '0')}
+                          <div className={`tide-detail tide-${tideInfo.type}`}>
+                            <span className={`tide-label ${tideInfo.type}`}>
+                              {tideInfo.type === 'high' ? '🔺만조' : '🔻간조'}
                             </span>
-                            <span className="tide-height">({tideInfo.height.toFixed(2)}m)</span>
+                            <span className="tide-time">{tideInfo.time}</span>
+                            <span className="tide-info">
+                              {tideInfo.height.toFixed(2)}m {tideInfo.change > 0 ? `(+${tideInfo.change}%)` : `(${tideInfo.change}%)`}
+                            </span>
                           </div>
                         ) : (
                           <span>-</span>
