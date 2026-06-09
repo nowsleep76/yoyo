@@ -949,3 +949,216 @@
     height: 200px;
   }
 }
+
+/* 통계 섹션 */
+.stats-section {
+  padding: 15px;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.my-stats-card {
+  background: linear-gradient(135deg, #f0f7ff 0%, #e8f4ff 100%);
+  border: 2px solid #0066cc;
+  border-radius: 12px;
+  padding: 25px;
+}
+
+.stats-header {
+  text-align: center;
+  margin-bottom: 30px;
+  padding-bottom: 20px;
+  border-bottom: 2px solid #0066cc;
+}
+
+.grade-display h2 {
+  font-size: 16px;
+  color: #666;
+  margin: 0 0 12px 0;
+  font-weight: 500;
+}
+
+.grade-badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.grade-emoji {
+  font-size: 48px;
+  line-height: 1;
+}
+
+.grade-name {
+  font-size: 24px;
+  color: #0066cc;
+  font-weight: 700;
+}
+
+.grade-desc {
+  font-size: 13px;
+  color: #666;
+  margin: 8px 0 0 0;
+  font-style: italic;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 15px;
+  margin-bottom: 25px;
+}
+
+.stat-box {
+  background: white;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  padding: 15px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.stat-icon {
+  font-size: 28px;
+  line-height: 1;
+}
+
+.stat-label {
+  font-size: 11px;
+  color: #999;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.stat-value {
+  font-size: 18px;
+  color: #0066cc;
+  font-weight: 700;
+}
+
+.score-section {
+  background: white;
+  border-radius: 8px;
+  padding: 15px;
+  text-align: center;
+}
+
+.score-section h4 {
+  font-size: 13px;
+  color: #333;
+  margin: 0 0 10px 0;
+  font-weight: 600;
+}
+
+.score-bar {
+  background: #e0e0e0;
+  border-radius: 10px;
+  height: 20px;
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+
+.score-progress {
+  background: linear-gradient(90deg, #0066cc, #00d4ff);
+  height: 100%;
+  border-radius: 10px;
+  transition: width 0.3s;
+}
+
+.score-text {
+  font-size: 12px;
+  color: #666;
+  margin: 0;
+}
+
+/* 랭킹 섹션 */
+.rankings-section {
+  padding: 15px;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.ranking-card {
+  background: linear-gradient(135deg, #f9f9f9 0%, #f5f5f5 100%);
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 15px;
+  overflow-x: auto;
+}
+
+.ranking-card h3 {
+  font-size: 14px;
+  color: #333;
+  margin: 0 0 12px 0;
+  font-weight: 700;
+}
+
+.ranking-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.ranking-table thead {
+  background: linear-gradient(135deg, #0066cc, #0052a3);
+  color: white;
+}
+
+.ranking-table th {
+  padding: 10px 8px;
+  text-align: left;
+  font-weight: 600;
+  white-space: nowrap;
+  border-bottom: 2px solid #0066cc;
+}
+
+.ranking-table td {
+  padding: 10px 8px;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.ranking-table tbody tr:hover {
+  background-color: #f0f7ff;
+}
+
+.ranking-table .rank {
+  font-weight: 700;
+  text-align: center;
+}
+
+.ranking-table .user-name {
+  color: #0066cc;
+  font-weight: 600;
+}
+
+.ranking-table .score {
+  color: #ff6b35;
+  font-weight: 600;
+}
+
+.ranking-table .size {
+  color: #e74c3c;
+  font-weight: 600;
+}
+
+.ranking-table .count {
+  color: #27ae60;
+  font-weight: 600;
+}
+
+.no-data {
+  text-align: center;
+  color: #999;
+  font-size: 12px;
+  padding: 15px;
+  margin: 0;
+}

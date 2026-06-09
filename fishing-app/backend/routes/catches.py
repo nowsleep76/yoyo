@@ -3,6 +3,7 @@ from models.database import (
     add_catch_record, get_all_catches, get_catch_by_id, update_catch_record,
     delete_catch_record, like_catch_record
 )
+from collections import defaultdict
 
 catches_bp = Blueprint('catches', __name__, url_prefix='/api/catches')
 
@@ -299,5 +300,108 @@ def fetch_nearby_catches():
             nearby.sort(key=lambda x: x.get('distance_km', 0))
 
         return jsonify(nearby), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 400
+
+# 등급 계산 함수
+def calculate_score(total_catches, max_size, average_size, likes):
+    return int((total_catches * 10) + (max_size * 2) + (average_size * 5) + (likes * 5))
+
+def get_grade(score):
+    if score < 51:
+        return {'emoji': '🎣', 'name': '막내 낚시꾼', 'desc': '이제 시작이에요!'}
+    elif score < 151:
+        return {'emoji': '🌊', 'name': '물때 배우는중', 'desc': '물때 감을 익혀요!'}
+    elif score < 301:
+        return {'emoji': '🎯', 'name': '묵직한 손맛', 'desc': '조황을 알아요!'}
+    elif score < 501:
+        return {'emoji': '👑', 'name': '대물사냥꾼', 'desc': '큰 고기가 나를 부릅니다!'}
+    elif score < 801:
+        return {'emoji': '🏆', 'name': '낚시의 신', 'desc': '바다가 나를 따라요!'}
+    else:
+        return {'emoji': '👨‍⚓', 'name': '영광의 어사', 'desc': '낚시의 전설입니다!'}
+
+@catches_bp.route('/rankings/grade', methods=['GET'])
+def get_grade_rankings():
+    """등급 랭킹 (상위 10명)"""
+    try:
+        catches = get_all_catches(limit=1000)
+        public_catches = [c for c in catches if c.get('is_public')]
+
+        # 사용자별 통계 계산
+        user_stats = defaultdict(lambda: {'total': 0, 'max_size': 0, 'sizes': [], 'likes': 0})
+
+        for catch in public_catches:
+            user_id = catch.get('user_id') or catch.get('user_nickname') or '익명'
+            user_stats[user_id]['total'] += 1
+            user_stats[user_id]['max_size'] = max(user_stats[user_id]['max_size'], catch.get('size_cm', 0))
+            user_stats[user_id]['sizes'].append(catch.get('size_cm', 0))
+            user_stats[user_id]['likes'] += catch.get('like_count', 0)
+
+        # 점수 계산
+        rankings = []
+        for user_id, stats in user_stats.items():
+            avg_size = sum(stats['sizes']) / len(stats['sizes']) if stats['sizes'] else 0
+            score = calculate_score(stats['total'], stats['max_size'], avg_size, stats['likes'])
+            grade = get_grade(score)
+
+            rankings.append({
+                'userId': user_id,
+                'score': score,
+                'grade': f"{grade['emoji']} {grade['name']}",
+                'gradeDesc': grade['desc']
+            })
+
+        # 점수순 정렬 (내림차순)
+        rankings.sort(key=lambda x: x['score'], reverse=True)
+
+        return jsonify(rankings[:10]), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 400
+
+@catches_bp.route('/rankings/max-size', methods=['GET'])
+def get_max_size_rankings():
+    """최대어 랭킹 (상위 10명)"""
+    try:
+        catches = get_all_catches(limit=1000)
+        public_catches = [c for c in catches if c.get('is_public')]
+
+        # 사용자별 최대어 찾기
+        max_fish = {}
+        for catch in public_catches:
+            user_id = catch.get('user_id') or catch.get('user_nickname') or '익명'
+
+            if user_id not in max_fish or catch.get('size_cm', 0) > max_fish[user_id].get('size', 0):
+                max_fish[user_id] = {
+                    'userId': user_id,
+                    'species': catch.get('species', '-'),
+                    'size': catch.get('size_cm', 0)
+                }
+
+        # 크기순 정렬
+        rankings = sorted(max_fish.values(), key=lambda x: x['size'], reverse=True)
+
+        return jsonify(rankings[:10]), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 400
+
+@catches_bp.route('/rankings/count', methods=['GET'])
+def get_count_rankings():
+    """다작 랭킹 - 마리수 기준 (상위 10명)"""
+    try:
+        catches = get_all_catches(limit=1000)
+        public_catches = [c for c in catches if c.get('is_public')]
+
+        # 사용자별 마리수 계산
+        count_by_user = defaultdict(int)
+        for catch in public_catches:
+            user_id = catch.get('user_id') or catch.get('user_nickname') or '익명'
+            count_by_user[user_id] += 1
+
+        # 마리수순 정렬
+        rankings = [{'userId': user_id, 'count': count} for user_id, count in count_by_user.items()]
+        rankings.sort(key=lambda x: x['count'], reverse=True)
+
+        return jsonify(rankings[:10]), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 400

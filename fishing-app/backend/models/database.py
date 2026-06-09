@@ -466,13 +466,43 @@ def get_user_stats():
     cursor.execute('SELECT AVG(size_cm) as avg_size FROM catch_records')
     avg_size = cursor.fetchone()['avg_size'] or 0
 
+    cursor.execute('SELECT MAX(size_cm) as max_size FROM catch_records')
+    max_size = cursor.fetchone()['max_size'] or 0
+
+    cursor.execute('SELECT SUM(like_count) as total_likes FROM catch_records')
+    total_likes = cursor.fetchone()['total_likes'] or 0
+
     cursor.execute('SELECT species, COUNT(*) as count FROM catch_records GROUP BY species ORDER BY count DESC LIMIT 1')
     favorite = cursor.fetchone()
 
     conn.close()
 
+    # 점수 계산
+    score = int((total * 10) + (max_size * 2) + (avg_size * 5) + (total_likes * 5))
+
+    # 등급 결정
+    def get_grade(score):
+        if score < 51:
+            return {'emoji': '🎣', 'name': '막내 낚시꾼', 'desc': '이제 시작이에요!'}
+        elif score < 151:
+            return {'emoji': '🌊', 'name': '물때 배우는중', 'desc': '물때 감을 익혀요!'}
+        elif score < 301:
+            return {'emoji': '🎯', 'name': '묵직한 손맛', 'desc': '조황을 알아요!'}
+        elif score < 501:
+            return {'emoji': '👑', 'name': '대물사냥꾼', 'desc': '큰 고기가 나를 부릅니다!'}
+        elif score < 801:
+            return {'emoji': '🏆', 'name': '낚시의 신', 'desc': '바다가 나를 따라요!'}
+        else:
+            return {'emoji': '👨‍⚓', 'name': '영광의 어사', 'desc': '낚시의 전설입니다!'}
+
+    grade = get_grade(score)
+
     return {
         'total_catches': total,
         'avg_size': avg_size,
-        'favorite_species': favorite['species'] if favorite else None
+        'max_size': max_size,
+        'like_count': total_likes,
+        'favorite_species': favorite['species'] if favorite else None,
+        'score': score,
+        'grade': grade
     }

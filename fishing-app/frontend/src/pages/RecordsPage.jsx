@@ -15,6 +15,13 @@ function RecordsPage({ location }) {
   const [error, setError] = useState(null)
   const [selectedRecordId, setSelectedRecordId] = useState(null)
 
+  // 통계 및 랭킹 상태
+  const [myStats, setMyStats] = useState(null)
+  const [gradeRankings, setGradeRankings] = useState([])
+  const [maxSizeRankings, setMaxSizeRankings] = useState([])
+  const [countRankings, setCountRankings] = useState([])
+  const [rankingsLoading, setRankingsLoading] = useState(false)
+
   // 새 기록 입력 상태
   const [selectedLocation, setSelectedLocation] = useState(() => ({
     latitude: location.latitude,
@@ -79,13 +86,33 @@ function RecordsPage({ location }) {
         }
         if (statsRes.ok) {
           setStats(await statsRes.json())
+          setMyStats(await statsRes.json())
         }
+
+        // 랭킹 데이터 로드
+        loadRankings()
+
         setError(null)
       } catch (err) {
         setError('데이터를 불러올 수 없습니다')
         console.error(err)
       } finally {
         setLoading(false)
+      }
+    }
+
+    // 랭킹 데이터 로드 함수
+    const loadRankings = async () => {
+      try {
+        const gradeRes = await fetch('/api/catches/rankings/grade')
+        const sizeRes = await fetch('/api/catches/rankings/max-size')
+        const countRes = await fetch('/api/catches/rankings/count')
+
+        if (gradeRes.ok) setGradeRankings(await gradeRes.json())
+        if (sizeRes.ok) setMaxSizeRankings(await sizeRes.json())
+        if (countRes.ok) setCountRankings(await countRes.json())
+      } catch (err) {
+        console.error('랭킹 로드 실패:', err)
       }
     }
 
@@ -256,6 +283,20 @@ function RecordsPage({ location }) {
         >
           <i className="fas fa-star"></i>
           즐겨찾기
+        </button>
+        <button
+          className={`record-tab ${activeTab === 'stats' ? 'active' : ''}`}
+          onClick={() => setActiveTab('stats')}
+        >
+          <i className="fas fa-chart-bar"></i>
+          통계
+        </button>
+        <button
+          className={`record-tab ${activeTab === 'rankings' ? 'active' : ''}`}
+          onClick={() => setActiveTab('rankings')}
+        >
+          <i className="fas fa-trophy"></i>
+          랭킹
         </button>
       </div>
 
@@ -849,6 +890,150 @@ function RecordsPage({ location }) {
               </div>
             ))
           )}
+        </div>
+      )}
+
+      {!loading && activeTab === 'stats' && (
+        <div className="stats-section">
+          {myStats ? (
+            <div className="my-stats-card">
+              <div className="stats-header">
+                <div className="grade-display">
+                  <h2>나의 등급</h2>
+                  <div className="grade-badge">
+                    <span className="grade-emoji">{myStats.grade?.emoji || '🎣'}</span>
+                    <span className="grade-name">{myStats.grade?.name || '낚시꾼'}</span>
+                  </div>
+                  <p className="grade-desc">{myStats.grade?.desc}</p>
+                </div>
+              </div>
+
+              <div className="stats-grid">
+                <div className="stat-box">
+                  <span className="stat-icon">📊</span>
+                  <span className="stat-label">총 조과</span>
+                  <span className="stat-value">{myStats.total_catches || 0}마리</span>
+                </div>
+                <div className="stat-box">
+                  <span className="stat-icon">🏆</span>
+                  <span className="stat-label">최대어</span>
+                  <span className="stat-value">{myStats.max_size?.toFixed(1) || '-'}cm</span>
+                </div>
+                <div className="stat-box">
+                  <span className="stat-icon">📏</span>
+                  <span className="stat-label">평균 크기</span>
+                  <span className="stat-value">{myStats.avg_size?.toFixed(1) || '-'}cm</span>
+                </div>
+                <div className="stat-box">
+                  <span className="stat-icon">❤️</span>
+                  <span className="stat-label">좋아요</span>
+                  <span className="stat-value">{myStats.like_count || 0}개</span>
+                </div>
+              </div>
+
+              <div className="score-section">
+                <h4>종합 점수</h4>
+                <div className="score-bar">
+                  <div className="score-progress" style={{width: `${Math.min((myStats.score || 0) / 10, 100)}%`}}></div>
+                </div>
+                <p className="score-text">{myStats.score || 0}점 / 1000점</p>
+              </div>
+            </div>
+          ) : (
+            <div className="empty-message">
+              <i className="fas fa-inbox"></i>
+              <p>통계 데이터가 없습니다</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {!loading && activeTab === 'rankings' && (
+        <div className="rankings-section">
+          {/* 등급 랭킹 */}
+          <div className="ranking-card">
+            <h3>📊 등급 랭킹</h3>
+            {gradeRankings.length > 0 ? (
+              <table className="ranking-table">
+                <thead>
+                  <tr>
+                    <th>순위</th>
+                    <th>사용자</th>
+                    <th>등급</th>
+                    <th>점수</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {gradeRankings.map((item, idx) => (
+                    <tr key={idx}>
+                      <td className="rank">{['1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣'][idx] || `${idx + 1}`}</td>
+                      <td className="user-name">{item.userId}</td>
+                      <td>{item.grade}</td>
+                      <td className="score">{item.score}점</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : (
+              <p className="no-data">데이터가 없습니다</p>
+            )}
+          </div>
+
+          {/* 최대어 랭킹 */}
+          <div className="ranking-card">
+            <h3>🏆 최대어 랭킹</h3>
+            {maxSizeRankings.length > 0 ? (
+              <table className="ranking-table">
+                <thead>
+                  <tr>
+                    <th>순위</th>
+                    <th>사용자</th>
+                    <th>어종</th>
+                    <th>크기</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {maxSizeRankings.map((item, idx) => (
+                    <tr key={idx}>
+                      <td className="rank">{['1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣'][idx] || `${idx + 1}`}</td>
+                      <td className="user-name">{item.userId}</td>
+                      <td>{item.species}</td>
+                      <td className="size">{item.size?.toFixed(1)}cm</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : (
+              <p className="no-data">데이터가 없습니다</p>
+            )}
+          </div>
+
+          {/* 다작 랭킹 */}
+          <div className="ranking-card">
+            <h3>🐟 다작 랭킹</h3>
+            {countRankings.length > 0 ? (
+              <table className="ranking-table">
+                <thead>
+                  <tr>
+                    <th>순위</th>
+                    <th>사용자</th>
+                    <th>마리수</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {countRankings.map((item, idx) => (
+                    <tr key={idx}>
+                      <td className="rank">{['1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣'][idx] || `${idx + 1}`}</td>
+                      <td className="user-name">{item.userId}</td>
+                      <td className="count">{item.count}마리</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : (
+              <p className="no-data">데이터가 없습니다</p>
+            )}
+          </div>
         </div>
       )}
     </div>

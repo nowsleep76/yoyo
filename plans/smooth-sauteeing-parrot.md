@@ -1,93 +1,144 @@
-# 낚시 앱 고도화: 위치 공유 및 출조 계획 기능
+# 낚시 앱 V2: 통계 및 랭킹 시스템
 
 ## Context
-사용자가 다음 개선사항을 요청:
-1. 앱 전체에서 선택된 위치 표시
-2. 탐색 페이지: 지도 클릭 시 위치 변경 + 거리 기반 공개 기록 정렬
-3. 탐색 페이지에 "출조계획" 탭 추가: 날짜+어종으로 게시물 검색
-4. 테스트 데이터 100개 재생성 (인천 50개, 군산 50개)
+사용자가 다음 기능을 요청:
+1. 기록 페이지에 **통계 탭** - 나의 낚시 실적 + 재미있는 등급
+2. 기록 페이지에 **랭킹 탭** - 전체 사용자 랭킹 (등급, 최대어, 다작)
 
 ## Current State
-- App.jsx: location 상태 관리 + handleLocationChange 함수 존재
-- TidePage: 위치 선택 UI (지도, 명소 목록)
-- ExplorePage: 공개 기록 조회 + 지도 표시 (클릭 미지원)
-- RecordsPage: 새 기록 추가 + 리스트/SNS 모드
-- Backend: 거리 기반 조회 API 존재 (/api/catches/nearby)
+- RecordsPage: 현재 3개 탭 (조과 기록, 방문 이력, 즐겨찾기)
+- 백엔드: 기본 통계 API 존재 (/api/user/stats)
+- 테스트 데이터: 100개 (인천 50개, 군산 50개)
 
 ## Required Changes
 
-### 1. 위치 표시 헤더 추가
-**파일**: App.jsx, App.css
-- App.jsx main 최상단에 위치 정보 헤더 추가
-- 실시간 업데이트되도록 location state 활용
-- 좌표 + 지역명 표시
+### 1. 재미있는 낚시 등급 시스템
+**등급 기준 (종합 점수 기반):**
 
-### 2. ExplorePage 기능 확장
-**파일**: ExplorePage.jsx, ExplorePage.css
+```
+점수 계산 = (총 마리수 × 10) + (최대어 cm × 2) + (평균 크기 × 5) + (좋아요수 × 5)
 
-#### 2-1. 기존 탭 (기록)
-- 지도 클릭 이벤트: 위치 변경 → App의 handleLocationChange 호출
-- 공개 기록만 필터링 (기존 /api/catches/feed 활용)
-- 거리 기반 정렬 추가: Haversine 공식으로 계산 후 정렬
-- 리스트 형식 (RecordsPage의 리스트 모드 스타일 재사용)
+등급 배분:
+- 0-50점: 🎣 막내 낚시꾼 ("이제 시작이에요!")
+- 51-150점: 🌊 물때 배우는중 ("물때 감을 익혀요!")
+- 151-300점: 🎯 묵직한 손맛 ("조황을 알아요!")
+- 301-500점: 👑 대물사냥꾼 ("큰 고기가 나를 부릅니다!")
+- 501-800점: 🏆 낚시의 신 ("바다가 나를 따라요!")
+- 801+점: 👨‍⚓ 영광의 어사 ("낚시의 전설입니다!")
+```
 
-#### 2-2. 새 탭: "출조계획"
-- 탭 UI: "기록" | "출조계획" 버튼
-- 입력 UI:
-  ```
-  출조 날짜: [date input]
-  대상어종: [text input with autocomplete]
-  ```
-- 검색 로직:
-  1. API: `/api/catches/nearby?lat=X&lng=Y&date=YYYY-MM-DD`에 어종 필터 추가
-  2. 같은 날짜 + 같은 어종의 공개 게시물 조회
-  3. 거리순 정렬
-  4. 없으면 "첫번째 게시자가 되세요!!" 메시지
+### 2. RecordsPage 탭 구조
+현재: records | history | favorites
+추가: records | history | favorites | **통계** | **랭킹**
 
-### 3. Backend API 확장
-**파일**: /api/catches/nearby (기존) + 새 쿼리 파라미터
+### 3. 통계 탭 (내 정보)
+```
+┌─────────────────────────────────┐
+│     나의 낚시 통계               │
+├─────────────────────────────────┤
+│ 등급: 👑 대물사냥꾼               │
+│ 점수: 425/1000                   │
+│                                 │
+│ 📊 주요 지표:                    │
+│ • 총 조과: 42마리                │
+│ • 최대어: 51.2cm (우럭)          │
+│ • 평균 크기: 38.5cm              │
+│ • 좋아요 받음: 156개             │
+│                                 │
+│ 🎯 다음 등급까지: 75점 남음      │
+└─────────────────────────────────┘
+```
 
-- 현재: `/api/catches/nearby?lat=X&lng=Y&distance=10&sort=latest`
-- 추가: `?date=YYYY-MM-DD&species=어종`
-- 로직: 거리 + 날짜 + 어종으로 필터링
+### 4. 랭킹 탭 (전체 사용자)
+```
+📊 등급 랭킹
+┌───┬──────────┬────────┬─────┐
+│순 │ 사용자   │ 등급   │ 점수 │
+├───┼──────────┼────────┼─────┤
+│1️⃣ │ user1    │ 👑 대물│ 520 │
+│2️⃣ │ user2    │ 👑 대물│ 480 │
+│3️⃣ │ user3    │ 🎯 손맛│ 385 │
+└───┴──────────┴────────┴─────┘
 
-### 4. ExplorePage → App 위치 연동
-**파일**: ExplorePage.jsx, App.jsx
+🏆 최대어 랭킹
+┌───┬──────────┬────────┬────────┐
+│순 │ 사용자   │ 어종   │ 크기   │
+├───┼──────────┼────────┼────────┤
+│1️⃣ │ user1    │ 광어   │ 52.3cm │
+│2️⃣ │ user2    │ 우럭   │ 51.2cm │
+│3️⃣ │ user3    │ 감성돔 │ 48.5cm │
+└───┴──────────┴────────┴────────┘
 
-- ExplorePage가 onLocationChange 콜백 받기 (TidePage처럼)
-- 지도 클릭 시: `props.onLocationChange({latitude, longitude, name})`
-- App에서 location state 업데이트 → 헤더에 표시
+🐟 다작 랭킹 (마리수)
+┌───┬──────────┬────────┐
+│순 │ 사용자   │ 마리수 │
+├───┼──────────┼────────┤
+│1️⃣ │ user1    │ 52마리 │
+│2️⃣ │ user2    │ 42마리 │
+│3️⃣ │ user3    │ 38마리 │
+└───┴──────────┴────────┘
+```
 
-### 5. 테스트 데이터 재생성
-**파일**: /api/catches/generate-test (기존 엔드포인트 수정)
+### 5. Backend API 개선
 
-#### 인천 지역 (50개)
-- 좌표: 37.27~37.49 (위도), 126.57~126.70 (경도)
-- 어종: 우럭, 광어, 농어, 전갈이
-- 날짜: 최근 30일
-- 모든 필드 채우기: species, size_cm, user_nickname, tide_number, water_level, tidal_current, wind_speed, description, is_public=true
+#### 5-1. 사용자 통계 API 확장
+`GET /api/user/stats`
+```json
+{
+  "totalCatches": 42,
+  "maxSize": 51.2,
+  "maxSpecies": "우럭",
+  "averageSize": 38.5,
+  "likes": 156,
+  "score": 425,
+  "grade": "👑 대물사냥꾼",
+  "gradeDescription": "큰 고기가 나를 부릅니다!"
+}
+```
 
-#### 군산 지역 (50개)
-- 좌표: 35.95~36.05 (위도), 126.55~126.72 (경도)
-- 어종: 우럭, 광어, 감성돔, 방어
-- 날짜: 최근 30일
-- 모든 필드 채우기
+#### 5-2. 전체 랭킹 API 추가
+- `GET /api/catches/rankings/grade` - 등급 랭킹 (상위 10명)
+- `GET /api/catches/rankings/max-size` - 최대어 랭킹 (상위 10명)
+- `GET /api/catches/rankings/count` - 다작 랭킹 (상위 10명)
+
+### 6. Frontend 구현
+
+#### RecordsPage.jsx 변경
+```javascript
+const [activeTab, setActiveTab] = useState('records')
+// 추가: 'stats' 탭 + 'rankings' 탭
+
+// stats 탭: 내 통계 표시
+// rankings 탭: 3개의 랭킹 섹션 표시
+```
 
 ## Critical Files
-1. `/d/DEV/fishing-app/frontend/src/App.jsx` - 위치 헤더 추가 + onLocationChange 전달
-2. `/d/DEV/fishing-app/frontend/src/pages/ExplorePage.jsx` - 탭 추가 + 위치 연동 + 거리 정렬
-3. `/d/DEV/fishing-app/frontend/src/pages/ExplorePage.css` - 출조계획 입력 UI 스타일
-4. `/d/DEV/fishing-app/backend/routes/catches.py` - generate-test 수정 + nearby API 필터 추가
-5. `/d/DEV/fishing-app/frontend/src/App.css` - 위치 헤더 스타일
+1. `/d/DEV/fishing-app/backend/routes/catches.py` - 랭킹 API 추가
+2. `/d/DEV/fishing-app/frontend/src/pages/RecordsPage.jsx` - 탭 추가 + 통계/랭킹 UI
+3. `/d/DEV/fishing-app/frontend/src/pages/RecordsPage.css` - 통계 & 랭킹 스타일
 
-## Reusable Patterns
-- RecordsPage의 리스트 테이블 스타일 → ExplorePage 기록 탭에 재사용
-- TidePage의 onLocationChange 패턴 → ExplorePage도 동일하게 구현
-- Haversine 거리 계산 → 이미 ExplorePage에 구현되어 있음
+## Grade Calculation Logic
+```python
+def calculate_score(total_catches, max_size, average_size, likes):
+    return (total_catches * 10) + (max_size * 2) + (average_size * 5) + (likes * 5)
+
+def get_grade(score):
+    if score < 51:
+        return "🎣 막내 낚시꾼"
+    elif score < 151:
+        return "🌊 물때 배우는중"
+    elif score < 301:
+        return "🎯 묵직한 손맛"
+    elif score < 501:
+        return "👑 대물사냥꾼"
+    elif score < 801:
+        return "🏆 낚시의 신"
+    else:
+        return "👨‍⚓ 영광의 어사"
+```
 
 ## Verification
-1. 위치 헤더가 실시간 업데이트되는지 확인
-2. ExplorePage 지도 클릭 → location 변경 → 헤더 업데이트 확인
-3. 기록 탭: 거리순 정렬 확인
-4. 출조계획 탭: 날짜+어종으로 게시물 조회 확인
-5. 테스트 데이터: 인천 50개 + 군산 50개 생성 확인
+1. 통계 탭 열었을 때 내 점수 + 등급 표시
+2. 랭킹 탭에서 3개의 랭킹 모두 정렬 확인
+3. 점수 계산이 정확한지 검증
+4. 등급 기준이 정확히 적용되는지 확인
