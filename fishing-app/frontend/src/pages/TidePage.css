@@ -179,26 +179,27 @@
 }
 
 /* 날짜 선택 */
-.date-selector {
-  padding: 15px;
-  background: white;
-  border-bottom: 1px solid #e0e0e0;
-}
-
-.date-info {
-  font-size: 16px;
-  font-weight: 700;
-  margin-bottom: 10px;
-  color: #333;
-}
-
-.date-buttons {
+/* 날짜 선택 & 탭 바 통합 */
+.date-tab-bar {
   display: flex;
-  gap: 8px;
+  gap: 0;
+  background: white;
+  border-bottom: 2px solid #e0e0e0;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  flex-wrap: wrap;
 }
 
-.date-buttons button {
+.date-selector {
+  display: flex;
+  gap: 6px;
+  padding: 12px 15px;
   flex: 1;
+  min-width: 280px;
+  border-right: 1px solid #e0e0e0;
+  align-items: center;
+}
+
+.date-nav-btn {
   padding: 8px 12px;
   border: 1px solid #ddd;
   background: white;
@@ -207,20 +208,22 @@
   font-size: 12px;
   font-weight: 600;
   transition: all 0.2s;
+  white-space: nowrap;
 }
 
-.date-buttons button:hover:not(:disabled) {
+.date-nav-btn:hover:not(:disabled) {
   border-color: #0066cc;
   color: #0066cc;
+  background: #f0f7ff;
 }
 
-.date-buttons button.active {
+.date-nav-btn.active {
   background: #0066cc;
   color: white;
   border-color: #0066cc;
 }
 
-.date-buttons button:disabled {
+.date-nav-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
@@ -228,11 +231,12 @@
 /* 물때 정보 헤더 */
 .tide-info-header {
   display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
+  grid-template-columns: 1fr 1fr 1fr 1fr;
   gap: 10px;
   padding: 15px;
-  background: white;
+  background: linear-gradient(135deg, #f0f7ff 0%, #f5f9ff 100%);
   border-bottom: 1px solid #e0e0e0;
+  border-top: 2px solid #0066cc;
 }
 
 .info-item {
@@ -259,14 +263,14 @@
 .tab-navigation {
   display: flex;
   gap: 0;
-  padding: 0;
+  flex: 1;
   background: white;
-  border-bottom: 1px solid #e0e0e0;
+  border-left: 1px solid #e0e0e0;
 }
 
 .tab-btn {
   flex: 1;
-  padding: 12px;
+  padding: 12px 16px;
   border: none;
   background: white;
   color: #666;
@@ -274,10 +278,27 @@
   cursor: pointer;
   border-bottom: 3px solid transparent;
   transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border-right: 1px solid #e0e0e0;
+  font-size: 14px;
+}
+
+.tab-btn:last-child {
+  border-right: none;
 }
 
 .tab-btn:hover {
   color: #0066cc;
+  background: #f0f7ff;
+}
+
+.tab-btn.active {
+  color: #0066cc;
+  border-bottom-color: #0066cc;
+  background: #f5f9ff;
 }
 
 .tab-btn.active {
@@ -684,6 +705,33 @@
     font-size: 11px;
   }
 
+  .date-tab-bar {
+    flex-direction: column;
+  }
+
+  .date-selector {
+    border-right: none;
+    border-bottom: 1px solid #e0e0e0;
+    min-width: auto;
+    padding: 10px;
+    gap: 4px;
+  }
+
+  .date-nav-btn {
+    padding: 6px 10px;
+    font-size: 11px;
+  }
+
+  .tab-navigation {
+    border-left: none;
+  }
+
+  .tab-btn {
+    padding: 10px 12px;
+    font-size: 12px;
+    border-right: 1px solid #e0e0e0;
+  }
+
   .tide-info-header {
     grid-template-columns: 1fr 1fr 1fr;
     gap: 8px;
@@ -807,6 +855,36 @@
 }
 
 @media (max-width: 480px) {
+  .date-tab-bar {
+    flex-direction: column;
+  }
+
+  .date-selector {
+    border-right: none;
+    border-bottom: 1px solid #e0e0e0;
+    padding: 8px;
+    gap: 3px;
+  }
+
+  .date-nav-btn {
+    padding: 5px 8px;
+    font-size: 10px;
+  }
+
+  .tab-navigation {
+    border-left: none;
+  }
+
+  .tab-btn {
+    padding: 8px 10px;
+    font-size: 11px;
+    border-right: 1px solid #e0e0e0;
+  }
+
+  .tab-btn i {
+    display: none;
+  }
+
   .tide-info-header {
     grid-template-columns: 1fr 1fr 1fr;
     gap: 6px;

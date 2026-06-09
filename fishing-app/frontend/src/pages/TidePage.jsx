@@ -280,39 +280,19 @@ function TidePage({ location, onLocationChange }) {
         </div>
       )}
 
-      {/* 날짜 선택 */}
-      <div className="date-selector">
-        <div className="date-info">{dateStr}</div>
-        <div className="date-buttons">
-          <button
-            disabled={selectedDate.toDateString() === new Date(selectedDate.getTime() - 86400000).toDateString()}
-            onClick={() => setSelectedDate(new Date(selectedDate.getTime() - 86400000))}
-          >
-            ← 어제
-          </button>
-          <button
-            onClick={() => setSelectedDate(new Date())}
-            className={selectedDate.toDateString() === new Date().toDateString() ? 'active' : ''}
-          >
-            오늘
-          </button>
-          <button
-            onClick={() => setSelectedDate(new Date(selectedDate.getTime() + 86400000))}
-          >
-            내일 →
-          </button>
-        </div>
-      </div>
-
       {/* 물때 정보 헤더 */}
       <div className="tide-info-header">
         <div className="info-item">
-          <span className="info-label">물때 번호</span>
-          <span className="info-value">{hourlyData.tideNumber}물</span>
+          <span className="info-label">날짜</span>
+          <span className="info-value">{dateStr}</span>
         </div>
         <div className="info-item">
           <span className="info-label">음력</span>
           <span className="info-value">{lunarDate.month}월 {lunarDate.day}일</span>
+        </div>
+        <div className="info-item">
+          <span className="info-label">물때</span>
+          <span className="info-value">{hourlyData.tideNumber}물</span>
         </div>
         <div className="info-item">
           <span className="info-label">조류</span>
@@ -320,20 +300,47 @@ function TidePage({ location, onLocationChange }) {
         </div>
       </div>
 
-      {/* 탭 네비게이션 */}
-      <div className="tab-navigation">
-        <button
-          className={`tab-btn ${activeTab === 'tide' ? 'active' : ''}`}
-          onClick={() => setActiveTab('tide')}
-        >
-          물때
-        </button>
-        <button
-          className={`tab-btn ${activeTab === 'wind' ? 'active' : ''}`}
-          onClick={() => setActiveTab('wind')}
-        >
-          바람/파고
-        </button>
+      {/* 날짜 선택 & 탭 네비게이션 */}
+      <div className="date-tab-bar">
+        <div className="date-selector">
+          <button
+            disabled={selectedDate.toDateString() === new Date(selectedDate.getTime() - 86400000).toDateString()}
+            onClick={() => setSelectedDate(new Date(selectedDate.getTime() - 86400000))}
+            className="date-nav-btn"
+            title="어제"
+          >
+            ← 어제
+          </button>
+          <button
+            onClick={() => setSelectedDate(new Date())}
+            className={`date-nav-btn ${selectedDate.toDateString() === new Date().toDateString() ? 'active' : ''}`}
+            title="오늘"
+          >
+            오늘
+          </button>
+          <button
+            onClick={() => setSelectedDate(new Date(selectedDate.getTime() + 86400000))}
+            className="date-nav-btn"
+            title="내일"
+          >
+            내일 →
+          </button>
+        </div>
+
+        <div className="tab-navigation">
+          <button
+            className={`tab-btn ${activeTab === 'tide' ? 'active' : ''}`}
+            onClick={() => setActiveTab('tide')}
+          >
+            <i className="fas fa-water"></i> 물때
+          </button>
+          <button
+            className={`tab-btn ${activeTab === 'wind' ? 'active' : ''}`}
+            onClick={() => setActiveTab('wind')}
+          >
+            <i className="fas fa-wind"></i> 바람/파고
+          </button>
+        </div>
       </div>
 
       {/* 물때 탭 */}
