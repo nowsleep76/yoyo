@@ -282,21 +282,14 @@ function TidePage({ location, onLocationChange }) {
 
       {/* 물때 정보 헤더 */}
       <div className="tide-info-header">
-        <div className="info-item">
-          <span className="info-label">날짜</span>
-          <span className="info-value">{dateStr}</span>
-        </div>
-        <div className="info-item">
-          <span className="info-label">음력</span>
-          <span className="info-value">{lunarDate.month}월 {lunarDate.day}일</span>
-        </div>
-        <div className="info-item">
-          <span className="info-label">물때</span>
-          <span className="info-value">{hourlyData.tideNumber}물</span>
-        </div>
-        <div className="info-item">
-          <span className="info-label">조류</span>
-          <span className="info-value">{hourlyData.volume?.label || '중간'}</span>
+        <div className="header-info-line">
+          <span className="date-info">{dateStr}</span>
+          <span className="separator">/</span>
+          <span className="lunar-info">음력 {lunarDate.month}월 {lunarDate.day}일</span>
+          <span className="separator">/</span>
+          <span className="tide-info">{hourlyData.tideNumber}물</span>
+          <span className="separator">/</span>
+          <span className="current-info">조류 {hourlyData.volume?.label || '중간'}</span>
         </div>
       </div>
 
@@ -351,7 +344,6 @@ function TidePage({ location, onLocationChange }) {
             <table className="hourly-table">
               <thead>
                 <tr>
-                  <th className="sticky-date">날짜</th>
                   <th>시간</th>
                   <th>수위</th>
                   <th>변화</th>
@@ -377,10 +369,11 @@ function TidePage({ location, onLocationChange }) {
                   const tideRange = highTide - lowTide
                   const tidePercent = tideRange > 0 ? Math.round(((item.height - lowTide) / tideRange) * 100) : 50
 
-                  // 일출/일몰 시간 표시
+                  // 일출/일몰 시간 표시 (HH:MM 형식)
                   const isSunrise = item.hour === hourlyData.sunrise
                   const isSunset = item.hour === hourlyData.sunset
-                  const sunEvent = isSunrise ? '🌅일출' : isSunset ? '🌇일몰' : '-'
+                  const sunEvent = isSunrise ? `일출 ${String(hourlyData.sunrise).padStart(2, '0')}:00` :
+                                   isSunset ? `일몰 ${String(hourlyData.sunset).padStart(2, '0')}:00` : '-'
 
                   // 시간대별 배경 그래디언션 (야간/주간)
                   const isNight = item.hour < hourlyData.sunrise || item.hour >= hourlyData.sunset
@@ -388,7 +381,6 @@ function TidePage({ location, onLocationChange }) {
 
                   return (
                     <tr key={idx} className={bgClass}>
-                      <td className="sticky-date date-cell">{selectedDate.toLocaleDateString('ko-KR', {month: '2-digit', day: '2-digit'})}</td>
                       <td className="time-cell">{timeStr}</td>
                       <td className="height-cell">{item.height.toFixed(2)}m</td>
                       <td className="change-cell">
@@ -422,9 +414,9 @@ function TidePage({ location, onLocationChange }) {
                         {tideInfo ? (
                           <div className="tide-detail">
                             <span className={`tide-badge ${tideInfo.type}`}>
-                              {tideInfo.type === 'high' ? '▲만조' : '▼간조'}
+                              {tideInfo.type === 'high' ? '만조' : '간조'} {String(tideInfo.hour).padStart(2, '0')}:{String(tideInfo.time?.split(':')[1] || '00').padStart(2, '0')}
                             </span>
-                            <span className="tide-height">{tideInfo.height.toFixed(2)}m</span>
+                            <span className="tide-height">({tideInfo.height.toFixed(2)}m)</span>
                           </div>
                         ) : (
                           <span>-</span>
