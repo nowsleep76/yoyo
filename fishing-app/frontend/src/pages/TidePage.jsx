@@ -159,12 +159,12 @@ function TidePage({ location, onLocationChange }) {
     }
   }, [displayLocation])
 
-  if (loading || !hourlyData) {
-    return <div className="tide-page loading">로딩 중...</div>
-  }
-
   if (!displayLocation || !displayLocation.latitude) {
     return <div className="tide-page loading">위치 정보를 불러오는 중...</div>
+  }
+
+  if (loading || !hourlyData) {
+    return <div className="tide-page loading">날씨 데이터 로딩 중... ({displayLocation.name})</div>
   }
 
   const dateStr = selectedDate.toLocaleDateString('ko-KR', {
@@ -174,25 +174,12 @@ function TidePage({ location, onLocationChange }) {
     weekday: 'long'
   })
 
-  // 음력 계산
-  const calculateLunarDate = (date) => {
-    const referenceNewMoon = new Date(2000, 0, 6) // 2000년 1월 6일 새월
-    const daysDiff = Math.floor((date - referenceNewMoon) / (86400000))
-    const lunarCycle = daysDiff % (29.5 * 12) // 음력 연도 주기 (29.5일 * 12개월)
-    const lunarMonth = Math.floor(lunarCycle / 29.5) + 1
-    const lunarDay = Math.round(lunarCycle % 29.5) + 1
-
-    return {
-      month: lunarMonth > 12 ? lunarMonth - 12 : lunarMonth,
-      day: lunarDay > 29 ? 29 : lunarDay
-    }
-  }
-
-  const lunarDate = calculateLunarDate(selectedDate)
+  // 백엔드에서 제공하는 음력 정보 사용 (더 정확함)
+  const lunarDate = hourlyData?.lunar || { month: '-', day: '-' }
 
   // 천체 이벤트 맵
   const celestialMap = {}
-  if (hourlyData.celestialEvents) {
+  if (hourlyData?.celestialEvents) {
     hourlyData.celestialEvents.forEach(event => {
       if (!celestialMap[event.hour]) {
         celestialMap[event.hour] = []
@@ -203,16 +190,20 @@ function TidePage({ location, onLocationChange }) {
 
   // 만조/간조 맵
   const tideMap = {}
-  if (hourlyData.highTides) {
+  if (hourlyData?.highTides) {
     hourlyData.highTides.forEach(tide => {
-      const [h] = tide.time.split(':').map(Number)
-      tideMap[h] = { type: 'high', ...tide }
+      const [h] = (tide.time || '').split(':').map(Number)
+      if (!isNaN(h)) {
+        tideMap[h] = { type: 'high', ...tide }
+      }
     })
   }
-  if (hourlyData.lowTides) {
+  if (hourlyData?.lowTides) {
     hourlyData.lowTides.forEach(tide => {
-      const [h] = tide.time.split(':').map(Number)
-      tideMap[h] = { type: 'low', ...tide }
+      const [h] = (tide.time || '').split(':').map(Number)
+      if (!isNaN(h)) {
+        tideMap[h] = { type: 'low', ...tide }
+      }
     })
   }
 

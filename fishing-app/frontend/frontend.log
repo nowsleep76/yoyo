@@ -94,3 +94,7 @@ Port 5173 is in use, trying another one...
 [2m오전 11:18:42[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/RecordsPage.css[22m
 (node:22908) [DEP0060] DeprecationWarning: The `util._extend` API is deprecated. Please use Object.assign() instead.
 (Use `node --trace-deprecation ...` to show where the warning was created)
+[2m오후 12:55:20[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/TidePage.jsx[22m
+[2m오후 12:55:26[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/TidePage.jsx[22m
+[2m오후 12:55:30[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/TidePage.jsx[22m
+[2m오후 12:55:36[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/TidePage.jsx[22m

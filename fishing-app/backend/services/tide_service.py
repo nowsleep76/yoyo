@@ -98,6 +98,26 @@ def get_celestial_times(date, latitude):
         'moonset': moon_set
     }
 
+def get_lunar_date(target_date):
+    """양력 → 음력 변환 (근사 계산)"""
+    reference_new_moon = datetime(2000, 1, 6)  # 2000년 1월 6일 새달
+    days_since = (target_date - reference_new_moon).days
+    lunar_age = (days_since % 29.5306) + 1  # 음력 달의 정확한 주기: 29.5306일
+
+    # 음력 월 계산 (대략 29.5일 = 1개월)
+    lunar_month = int(lunar_age / 29.5306)
+    if lunar_month == 0:
+        lunar_month = 12
+    lunar_day = int((lunar_age % 29.5306)) + 1
+    if lunar_day > 29:
+        lunar_day = 29
+
+    return {
+        'month': lunar_month,
+        'day': lunar_day,
+        'age': round(lunar_age, 1)
+    }
+
 def get_tide_hourly(latitude, longitude, date_str=None):
     """날짜별 24시간 조석 높이 + 수온 + 만조/간조 계산"""
     reference_new_moon = datetime(2000, 1, 6)
@@ -108,9 +128,12 @@ def get_tide_hourly(latitude, longitude, date_str=None):
         target = datetime.now()
 
     days_since = (target - reference_new_moon).days
-    lunar_age = (days_since % 29.5) + 1
-    tide_num = int((lunar_age / 29.5) * 15) + 1
+    lunar_age = (days_since % 29.5306) + 1  # 더 정확한 음력 주기 사용
+    tide_num = int((lunar_age / 29.5306) * 15) + 1
     tide_num = min(15, max(1, tide_num))
+
+    # 음력 날짜 계산
+    lunar_info = get_lunar_date(target)
 
     # 천체 데이터 계산
     celestial = get_celestial_times(target, latitude)
@@ -240,6 +263,11 @@ def get_tide_hourly(latitude, longitude, date_str=None):
         'tideNumber': tide_num,
         'description': f'{tide_num}물',
         'volume': volume,
+        'lunar': {
+            'month': lunar_info['month'],
+            'day': lunar_info['day'],
+            'age': lunar_info['age']
+        },
         'hourly': hourly,
         'highTides': high_tides_camel,
         'lowTides': low_tides_camel,
