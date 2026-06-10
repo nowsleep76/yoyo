@@ -21,43 +21,15 @@ class FishingIndexService:
     def get_fishing_index(lat: float, lon: float, target_date: str) -> Optional[Dict]:
         """위치와 날짜에 따른 바다낚시지수 조회
 
-        Args:
-            lat: 위도
-            lon: 경도
-            target_date: 조회 날짜 (YYYY-MM-DD)
-
-        Returns:
-            {
-                'date': '2026-06-10',
-                'overall_index': 7,  # 0-10
-                'fish_species': {
-                    '우럭': 8,
-                    '감성돔': 6,
-                    '광어': 7
-                },
-                'conditions': {
-                    'water_temp': 18.5,
-                    'wave_height': 0.8,
-                    'wind_speed': 3.2,
-                    'visibility': '좋음'
-                },
-                'hourly': [
-                    {'hour': 6, 'index': 6, 'best_fish': '우럭'},
-                    {'hour': 7, 'index': 7, 'best_fish': '우럭'},
-                    ...
-                ]
-            } 또는 None
+        API 실패 시 자동으로 시뮬레이션 데이터 반환
         """
-        api_key = os.getenv('FISHING_INDEX_API_KEY')
-        if not api_key:
-            return None
-
         # 대상 날짜 유효성 확인 (오늘부터 D+3까지만)
         today = datetime.now().date()
         target = datetime.strptime(target_date, '%Y-%m-%d').date()
 
         if target < today or (target - today).days > 3:
-            return None
+            # 범위 밖이면 시뮬레이션으로 대체
+            return FishingIndexService._generate_simulated_data(lat, lon, target_date)
 
         # 캐시 확인
         cache_key = (target_date, round(lat, 2), round(lon, 2))
@@ -66,80 +38,85 @@ class FishingIndexService:
             if datetime.now() - timestamp < timedelta(seconds=FishingIndexService.CACHE_TTL):
                 return cached_data
 
-        try:
-            # 최근접 지역 찾기
-            nearest_region = FishingIndexService._find_nearest_region(lat, lon)
-            if not nearest_region:
-                return None
+        # API 호출 시도
+        api_key = os.getenv('FISHING_INDEX_API_KEY')
+        if api_key:
+            try:
+                # 최근접 지역 찾기
+                nearest_region = FishingIndexService._find_nearest_region(lat, lon)
+                if not nearest_region:
+                    return FishingIndexService._generate_simulated_data(lat, lon, target_date)
 
-            # API 호출
-            target_date_str = target_date.replace('-', '')
-            params = {
-                'serviceKey': api_key,
-                'search_area_code': nearest_region['area_code'],
-                'search_date': target_date_str,
-                'output': 'json'
-            }
-
-            response = requests.get(
-                FishingIndexService.BASE_URL,
-                params=params,
-                timeout=10
-            )
-            response.raise_for_status()
-
-            data = response.json()
-
-            # API 응답 파싱
-            if data.get('resultCode') == '00' or data.get('result'):
-                result = data.get('result', {})
-
-                # 종합 낚시지수 (0-10)
-                overall_index = int(result.get('baseFishingIndex', 5))
-
-                # 어종별 지수
-                fish_species = {
-                    '우럭': int(result.get('redfin_Index', 5)),
-                    '감성돔': int(result.get('blackSeabream_Index', 5)),
-                    '광어': int(result.get('flatfish_Index', 5)),
-                    '농어': int(result.get('seabass_Index', 5)),
+                # API 호출
+                target_date_str = target_date.replace('-', '')
+                params = {
+                    'serviceKey': api_key,
+                    'search_area_code': nearest_region['area_code'],
+                    'search_date': target_date_str,
+                    'output': 'json'
                 }
 
-                # 해황 조건
-                conditions = {
-                    'water_temp': float(result.get('waterTemperature', 18.0)),
-                    'wave_height': float(result.get('waveHeight', 0.5)),
-                    'wind_speed': float(result.get('windSpeed', 3.0)),
-                    'visibility': FishingIndexService._get_visibility(result.get('visibility', 3))
-                }
-
-                # 시간별 지수 (기본값: 시뮬레이션)
-                hourly = FishingIndexService._generate_hourly_index(
-                    overall_index,
-                    target_date
+                response = requests.get(
+                    FishingIndexService.BASE_URL,
+                    params=params,
+                    timeout=10
                 )
+                response.raise_for_status()
 
-                fishing_data = {
-                    'date': target_date,
-                    'location': nearest_region['name'],
-                    'lat': lat,
-                    'lon': lon,
-                    'overall_index': overall_index,
-                    'fish_species': fish_species,
-                    'conditions': conditions,
-                    'hourly': hourly,
-                    'data_source': 'api'
-                }
+                data = response.json()
 
-                # 캐시 저장
-                FishingIndexService.CACHE[cache_key] = (fishing_data, datetime.now())
-                return fishing_data
+                # API 응답 파싱
+                if data.get('resultCode') == '00' or data.get('result'):
+                    result = data.get('result', {})
 
-            return None
+                    # 종합 낚시지수 (0-10)
+                    overall_index = int(result.get('baseFishingIndex', 5))
 
-        except Exception as e:
-            print(f"낚시지수 API 오류: {e}")
-            return None
+                    # 어종별 지수
+                    fish_species = {
+                        '우럭': int(result.get('redfin_Index', 5)),
+                        '감성돔': int(result.get('blackSeabream_Index', 5)),
+                        '광어': int(result.get('flatfish_Index', 5)),
+                        '농어': int(result.get('seabass_Index', 5)),
+                    }
+
+                    # 해황 조건
+                    conditions = {
+                        'water_temp': float(result.get('waterTemperature', 18.0)),
+                        'wave_height': float(result.get('waveHeight', 0.5)),
+                        'wind_speed': float(result.get('windSpeed', 3.0)),
+                        'visibility': FishingIndexService._get_visibility(result.get('visibility', 3))
+                    }
+
+                    # 시간별 지수
+                    hourly = FishingIndexService._generate_hourly_index(
+                        overall_index,
+                        target_date
+                    )
+
+                    fishing_data = {
+                        'date': target_date,
+                        'location': nearest_region['name'],
+                        'lat': lat,
+                        'lon': lon,
+                        'overall_index': overall_index,
+                        'fish_species': fish_species,
+                        'conditions': conditions,
+                        'hourly': hourly,
+                        'data_source': 'api'  # 실제 API 데이터
+                    }
+
+                    # 캐시 저장
+                    FishingIndexService.CACHE[cache_key] = (fishing_data, datetime.now())
+                    return fishing_data
+
+            except Exception as e:
+                print(f"낚시지수 API 오류 (자동 폴백): {e}")
+                # API 실패 → 시뮬레이션으로 대체
+                return FishingIndexService._generate_simulated_data(lat, lon, target_date)
+
+        # API 키 없음 → 시뮬레이션
+        return FishingIndexService._generate_simulated_data(lat, lon, target_date)
 
     @staticmethod
     def _find_nearest_region(lat: float, lon: float) -> Optional[Dict]:
@@ -166,6 +143,46 @@ class FishingIndexService:
             4: '매우 좋음'
         }
         return visibility_map.get(visibility_code, '보통')
+
+    @staticmethod
+    def _generate_simulated_data(lat: float, lon: float, target_date: str) -> Dict:
+        """API 호출 실패 시 시뮬레이션 데이터 생성"""
+        nearest_region = FishingIndexService._find_nearest_region(lat, lon)
+
+        # 날짜 기반 의사난수 생성 (같은 날짜면 같은 데이터)
+        target_hash = sum(ord(c) for c in target_date)
+        overall_index = (target_hash % 7) + 4  # 4-10
+
+        fish_species = {
+            '우럭': (target_hash * 2) % 10,
+            '감성돔': (target_hash * 3) % 10,
+            '광어': (target_hash * 5) % 10,
+            '농어': (target_hash * 7) % 10,
+        }
+
+        conditions = {
+            'water_temp': 16.0 + (target_hash % 6),
+            'wave_height': 0.5 + (target_hash % 10) * 0.1,
+            'wind_speed': 2.0 + (target_hash % 6),
+            'visibility': ['나쁨', '보통', '좋음', '매우좋음'][target_hash % 4]
+        }
+
+        hourly = FishingIndexService._generate_hourly_index(
+            overall_index,
+            target_date
+        )
+
+        return {
+            'date': target_date,
+            'location': nearest_region['name'] if nearest_region else '위치 감지 불가',
+            'lat': lat,
+            'lon': lon,
+            'overall_index': overall_index,
+            'fish_species': fish_species,
+            'conditions': conditions,
+            'hourly': hourly,
+            'data_source': 'simulated'  # 시뮬레이션 데이터 표시
+        }
 
     @staticmethod
     def _generate_hourly_index(overall_index: int, target_date: str) -> list:
