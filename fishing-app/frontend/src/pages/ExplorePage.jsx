@@ -25,6 +25,12 @@ function ExplorePage({ location, onLocationChange }) {
   const [speciesFilterSort, setSpeciesFilterSort] = useState('latest')
   const [filteredCatches, setFilteredCatches] = useState([])
 
+  // 낚시지수 탭 상태
+  const [fishingIndexDate, setFishingIndexDate] = useState(new Date().toISOString().split('T')[0])
+  const [fishingIndexData, setFishingIndexData] = useState(null)
+  const [fishingIndexLoading, setFishingIndexLoading] = useState(false)
+  const [fishingIndexError, setFishingIndexError] = useState(null)
+
   const mapRef = useRef(null)
   const mapInstanceRef = useRef(null)
   const markersRef = useRef([])
@@ -312,6 +318,13 @@ function ExplorePage({ location, onLocationChange }) {
         >
           <i className="fas fa-fish"></i>
           어종별
+        </button>
+        <button
+          className={`explore-tab ${activeTab === 'fishing-index' ? 'active' : ''}`}
+          onClick={() => setActiveTab('fishing-index')}
+        >
+          <i className="fas fa-star"></i>
+          낚시지수
         </button>
       </div>
 
@@ -601,6 +614,141 @@ function ExplorePage({ location, onLocationChange }) {
             </div>
           </div>
         </div>
+      )}
+
+      {/* 낚시지수 탭 */}
+      {activeTab === 'fishing-index' && (
+      <div className="fishing-index-container">
+        <div className="fishing-index-header">
+          <h3>🌊 오늘의 낚시지수</h3>
+          <p>선택 위치와 날짜의 낚시 여건을 확인하세요</p>
+        </div>
+
+        <div className="fishing-index-controls">
+          <div className="control-group">
+            <label>날짜 선택</label>
+            <input
+              type="date"
+              value={fishingIndexDate}
+              onChange={(e) => {
+                setFishingIndexDate(e.target.value)
+                setFishingIndexData(null)
+              }}
+              className="form-input"
+            />
+          </div>
+          <button
+            className="btn-search"
+            onClick={async () => {
+              if (!location?.latitude) {
+                setFishingIndexError('위치 정보가 없습니다')
+                return
+              }
+              setFishingIndexLoading(true)
+              setFishingIndexError(null)
+              try {
+                const response = await fetch(
+                  `/api/fishing/index?lat=${location.latitude}&lon=${location.longitude}&date=${fishingIndexDate}`
+                )
+                if (response.ok) {
+                  const data = await response.json()
+                  setFishingIndexData(data)
+                } else {
+                  setFishingIndexError('낚시지수 데이터를 조회할 수 없습니다')
+                }
+              } catch (err) {
+                setFishingIndexError('조회 실패: ' + err.message)
+              } finally {
+                setFishingIndexLoading(false)
+              }
+            }}
+          >
+            <i className="fas fa-search"></i>
+            조회
+          </button>
+        </div>
+
+        {fishingIndexError && (
+          <div className="error-message">{fishingIndexError}</div>
+        )}
+
+        {fishingIndexLoading && (
+          <div className="loading-message">낚시지수 로딩 중...</div>
+        )}
+
+        {!fishingIndexLoading && fishingIndexData && (
+          <div className="fishing-index-content">
+            {/* 종합 지수 */}
+            <div className="index-overall-card">
+              <div className="overall-index-display">
+                <span className="label">종합 낚시지수</span>
+                <div className="index-score">{fishingIndexData.overall_index}/10</div>
+                <div className="index-gauge">
+                  <div className="gauge-bar" style={{width: `${fishingIndexData.overall_index * 10}%`}}></div>
+                </div>
+              </div>
+            </div>
+
+            {/* 해황 조건 */}
+            <div className="conditions-section">
+              <h4>🌡️ 해황 조건</h4>
+              <div className="conditions-grid">
+                <div className="condition-item">
+                  <span className="condition-label">수온</span>
+                  <span className="condition-value">{fishingIndexData.conditions?.water_temp}°C</span>
+                </div>
+                <div className="condition-item">
+                  <span className="condition-label">파고</span>
+                  <span className="condition-value">{fishingIndexData.conditions?.wave_height}m</span>
+                </div>
+                <div className="condition-item">
+                  <span className="condition-label">풍속</span>
+                  <span className="condition-value">{fishingIndexData.conditions?.wind_speed}m/s</span>
+                </div>
+                <div className="condition-item">
+                  <span className="condition-label">가시거리</span>
+                  <span className="condition-value">{fishingIndexData.conditions?.visibility}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* 어종별 지수 */}
+            <div className="species-index-section">
+              <h4>🐟 어종별 낚시지수</h4>
+              <div className="species-index-list">
+                {Object.entries(fishingIndexData.fish_species || {}).map(([species, index]) => (
+                  <div key={species} className="species-index-item">
+                    <span className="species-name">{species}</span>
+                    <div className="species-gauge">
+                      <div className="gauge-bar" style={{width: `${index * 10}%`}}></div>
+                    </div>
+                    <span className="species-index">{index}/10</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* 시간별 지수 */}
+            <div className="hourly-index-section">
+              <h4>⏰ 시간별 낚시지수</h4>
+              <div className="hourly-cards">
+                {(fishingIndexData.hourly || []).slice(0, 8).map((hour) => (
+                  <div key={hour.hour} className="hourly-card">
+                    <div className="hour-label">{String(hour.hour).padStart(2, '0')}:00</div>
+                    <div className="hour-index">{hour.index}</div>
+                    <div className="hour-fish">{hour.best_fish}</div>
+                    <div className="hour-activity">{hour.activity}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="fishing-info-note">
+              📍 위치: {fishingIndexData.location} | 📅 {fishingIndexDate}
+            </div>
+          </div>
+        )}
+      </div>
       )}
     </div>
   )

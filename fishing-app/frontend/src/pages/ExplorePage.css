@@ -681,6 +681,301 @@
   border-bottom: 2px solid #ddd;
 }
 
+/* 낚시지수 탭 */
+.fishing-index-container {
+  background: white;
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.fishing-index-header {
+  margin-bottom: 20px;
+  text-align: center;
+}
+
+.fishing-index-header h3 {
+  font-size: 20px;
+  color: #0066cc;
+  margin: 0 0 8px 0;
+}
+
+.fishing-index-header p {
+  color: #999;
+  font-size: 13px;
+  margin: 0;
+}
+
+.fishing-index-controls {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.control-group {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.control-group label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #333;
+}
+
+.form-input {
+  padding: 8px 12px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 13px;
+  font-family: 'Noto Sans KR', sans-serif;
+}
+
+.form-input:focus {
+  outline: none;
+  border-color: #0066cc;
+  box-shadow: 0 0 0 2px rgba(0, 102, 204, 0.1);
+}
+
+.btn-search {
+  padding: 8px 16px;
+  background: #0066cc;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  align-self: flex-end;
+  transition: background 0.2s;
+}
+
+.btn-search:hover {
+  background: #0052a3;
+}
+
+.fishing-index-content {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* 종합 지수 */
+.index-overall-card {
+  background: linear-gradient(135deg, #f0f7ff 0%, #e6f2ff 100%);
+  padding: 20px;
+  border-radius: 8px;
+  border-left: 4px solid #0066cc;
+}
+
+.overall-index-display {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.overall-index-display .label {
+  font-size: 13px;
+  color: #666;
+  font-weight: 600;
+}
+
+.index-score {
+  font-size: 48px;
+  font-weight: 700;
+  color: #0066cc;
+}
+
+.index-gauge {
+  width: 100%;
+  max-width: 200px;
+  height: 8px;
+  background: #ddd;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.index-gauge .gauge-bar {
+  height: 100%;
+  background: linear-gradient(90deg, #ff6b35, #ffa500, #0066cc);
+  transition: width 0.3s;
+}
+
+/* 해황 조건 */
+.conditions-section {
+  background: #f9f9f9;
+  padding: 15px;
+  border-radius: 8px;
+}
+
+.conditions-section h4 {
+  margin: 0 0 12px 0;
+  font-size: 14px;
+  color: #333;
+}
+
+.conditions-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 10px;
+}
+
+.condition-item {
+  background: white;
+  padding: 10px;
+  border-radius: 6px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid #eee;
+}
+
+.condition-label {
+  font-size: 11px;
+  color: #999;
+  font-weight: 600;
+}
+
+.condition-value {
+  font-size: 16px;
+  font-weight: 700;
+  color: #0066cc;
+}
+
+/* 어종별 지수 */
+.species-index-section {
+  background: #f9f9f9;
+  padding: 15px;
+  border-radius: 8px;
+}
+
+.species-index-section h4 {
+  margin: 0 0 12px 0;
+  font-size: 14px;
+  color: #333;
+}
+
+.species-index-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.species-index-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.species-name {
+  width: 70px;
+  font-weight: 600;
+  font-size: 13px;
+  color: #333;
+}
+
+.species-gauge {
+  flex: 1;
+  height: 6px;
+  background: #ddd;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.species-index {
+  width: 45px;
+  text-align: right;
+  font-weight: 700;
+  font-size: 13px;
+  color: #0066cc;
+}
+
+/* 시간별 지수 */
+.hourly-index-section {
+  background: #f9f9f9;
+  padding: 15px;
+  border-radius: 8px;
+}
+
+.hourly-index-section h4 {
+  margin: 0 0 12px 0;
+  font-size: 14px;
+  color: #333;
+}
+
+.hourly-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
+  gap: 8px;
+}
+
+.hourly-card {
+  background: white;
+  padding: 10px;
+  border-radius: 6px;
+  text-align: center;
+  border: 1px solid #eee;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.hour-label {
+  font-size: 11px;
+  color: #999;
+  font-weight: 600;
+}
+
+.hour-index {
+  font-size: 18px;
+  font-weight: 700;
+  color: #0066cc;
+}
+
+.hour-fish {
+  font-size: 11px;
+  color: #333;
+  font-weight: 600;
+}
+
+.hour-activity {
+  font-size: 10px;
+  color: #999;
+}
+
+.fishing-info-note {
+  text-align: center;
+  font-size: 12px;
+  color: #999;
+  padding: 10px;
+  background: #f5f5f5;
+  border-radius: 4px;
+}
+
+.error-message {
+  background: #ffebee;
+  color: #d32f2f;
+  padding: 12px;
+  border-radius: 4px;
+  border-left: 4px solid #d32f2f;
+  font-size: 13px;
+  margin-bottom: 15px;
+}
+
+.loading-message {
+  text-align: center;
+  padding: 30px;
+  color: #999;
+  font-size: 13px;
+}
+
 .catch-results-table tbody tr:hover {
   background: #f9f9f9;
 }

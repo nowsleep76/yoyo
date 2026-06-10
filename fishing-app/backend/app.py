@@ -9,6 +9,7 @@ from routes.spots import spots_bp
 from routes.feeding import feeding_bp
 from routes.catches import catches_bp
 from routes.user import user_bp
+from routes.fishing_index import fishing_index_bp
 import os
 
 load_dotenv()
@@ -28,6 +29,7 @@ app.register_blueprint(spots_bp)
 app.register_blueprint(feeding_bp)
 app.register_blueprint(catches_bp)
 app.register_blueprint(user_bp)
+app.register_blueprint(fishing_index_bp)
 
 @app.route('/api/health', methods=['GET'])
 def health():
