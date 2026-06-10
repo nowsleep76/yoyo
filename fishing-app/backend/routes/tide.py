@@ -1,9 +1,11 @@
+print("[TIDE.PY] Importing tide.py module...")
 from flask import Blueprint, request, jsonify
 from services.tide_service import get_tide_data, get_tide_calendar, get_tide_hourly
 from datetime import datetime
 from services.tides_korea import get_tide_for_date, LUNAR_CONVERSION_2026
 
 tide_bp = Blueprint('tide', __name__)
+print("[TIDE.PY] tide_bp created")
 
 @tide_bp.route('/api/tide', methods=['GET'])
 def fetch_tide():
@@ -20,6 +22,11 @@ def fetch_tide_hourly():
     longitude = request.args.get('lon', type=float, default=126.9780)
     date_str = request.args.get('date', type=str, default=None)
 
+    # 일반 계산 방식으로 hourly_data 항상 먼저 조회
+    hourly_data = get_tide_hourly(latitude, longitude, date_str)
+    print(f"DEBUG: hourly_data keys = {list(hourly_data.keys())}")
+    print(f"DEBUG: weatherSource = {hourly_data.get('weatherSource')}")
+
     # 정확한 데이터를 먼저 시도
     if date_str:
         target = datetime.strptime(date_str, '%Y-%m-%d')
@@ -27,9 +34,6 @@ def fetch_tide_hourly():
         lunar_info = LUNAR_CONVERSION_2026.get((target.month, target.day))
 
         if tide_info and lunar_info:
-            # 정확한 한국 조석표 데이터 사용
-            hourly_data = get_tide_hourly(latitude, longitude, date_str)
-
             # get_tide_hourly()에서 이미 highTides/lowTides를 height와 함께 반환하므로
             # lunar 필드 키를 정규화하여 업데이트
             hourly_data.update({
@@ -40,11 +44,16 @@ def fetch_tide_hourly():
                 },
                 'tideStrength': tide_info.get('strength', '중')
             })
-            return jsonify(hourly_data)
 
-    # 일반 계산 방식으로 폴백
-    hourly_data = get_tide_hourly(latitude, longitude, date_str)
-    return jsonify(hourly_data)
+    result = jsonify(hourly_data)
+    print(f"DEBUG: jsonify result type = {type(result)}")
+    print(f"DEBUG: jsonify result data = {result.get_json()}")
+    return result
+
+@tide_bp.route('/api/tide/test-weather-source', methods=['GET'])
+def test_weather_source():
+    from flask import jsonify
+    return jsonify({'weatherSource': 'simulated', 'test': 'ok'})
 
 @tide_bp.route('/api/tide/calendar', methods=['GET'])
 def fetch_tide_calendar():
