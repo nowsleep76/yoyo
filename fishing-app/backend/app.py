@@ -21,12 +21,8 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
 
-print("[APP.PY] Registering blueprints...")
 app.register_blueprint(weather_bp)
-print("[APP.PY] Registered weather_bp")
 app.register_blueprint(tide_bp)
-print("[APP.PY] Registered tide_bp")
-print("[APP.PY] tide_bp rules:", [str(r) for r in app.url_map.iter_rules() if 'tide' in str(r)])
 app.register_blueprint(points_bp)
 app.register_blueprint(spots_bp)
 app.register_blueprint(feeding_bp)

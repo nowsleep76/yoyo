@@ -1,16 +1,18 @@
 from flask import Blueprint, request, jsonify
 from models.database import (
     add_fishing_session, get_fishing_history, add_favorite_spot,
-    get_favorite_spots, remove_favorite_spot, get_user_stats
+    get_favorite_spots, remove_favorite_spot, get_user_stats,
+    add_user, get_user, update_user, get_user_stats_filtered
 )
 
 user_bp = Blueprint('user', __name__, url_prefix='/api/user')
 
 @user_bp.route('/stats', methods=['GET'])
 def fetch_stats():
-    """사용자 통계 조회"""
+    """사용자 통계 조회 (user_id가 있으면 개인, 없으면 전체)"""
     try:
-        stats = get_user_stats()
+        user_id = request.args.get('user_id')
+        stats = get_user_stats_filtered(user_id=user_id)
         return jsonify(stats), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 400
@@ -82,5 +84,84 @@ def remove_favorite(favorite_id):
         remove_favorite_spot(favorite_id)
 
         return jsonify({'message': '즐겨찾기에서 제거되었습니다'}), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 400
+
+@user_bp.route('/favorite-catches', methods=['GET'])
+def fetch_favorite_catches():
+    """즐겨찾기한 조과 조회"""
+    try:
+        from models.database import get_favorite_catches
+        limit = request.args.get('limit', 50, type=int)
+        offset = request.args.get('offset', 0, type=int)
+
+        favorites = get_favorite_catches(limit=limit, offset=offset)
+
+        return jsonify(favorites), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 400
+
+# ===== 사용자 프로필 API =====
+
+@user_bp.route('/profile', methods=['GET'])
+def get_profile():
+    """사용자 프로필 조회"""
+    try:
+        user_id = request.args.get('user_id')
+        if not user_id:
+            return jsonify({'error': 'user_id is required'}), 400
+
+        user = get_user(user_id)
+        if not user:
+            return jsonify({'error': 'User not found'}), 404
+
+        return jsonify(user), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 400
+
+@user_bp.route('/profile', methods=['POST'])
+def create_profile():
+    """새 사용자 프로필 생성"""
+    try:
+        data = request.get_json()
+        user_id = data.get('user_id')
+        nickname = data.get('nickname')
+
+        if not user_id or not nickname:
+            return jsonify({'error': 'user_id and nickname are required'}), 400
+
+        result = add_user(
+            user_id=user_id,
+            nickname=nickname,
+            preferred_rod=data.get('preferred_rod', ''),
+            preferred_reel=data.get('preferred_reel', ''),
+            preferred_line_weight=data.get('preferred_line_weight', ''),
+            preferred_leader=data.get('preferred_leader', ''),
+            preferred_species=data.get('preferred_species', '')
+        )
+
+        if result is None:
+            return jsonify({'error': 'User already exists'}), 409
+
+        return jsonify({'id': result, 'message': '프로필이 생성되었습니다'}), 201
+    except Exception as e:
+        return jsonify({'error': str(e)}), 400
+
+@user_bp.route('/profile', methods=['PUT'])
+def update_profile():
+    """사용자 프로필 수정"""
+    try:
+        user_id = request.args.get('user_id')
+        if not user_id:
+            return jsonify({'error': 'user_id is required'}), 400
+
+        data = request.get_json()
+        success = update_user(user_id, **data)
+
+        if not success:
+            return jsonify({'error': 'Failed to update profile'}), 400
+
+        updated_user = get_user(user_id)
+        return jsonify(updated_user), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 400

@@ -30,6 +30,13 @@ function Navbar({ currentPage, onPageChange }) {
             <i className="fas fa-book"></i>
             <span>기록</span>
           </button>
+          <button
+            className={`nav-tab ${currentPage === 'profile' ? 'active' : ''}`}
+            onClick={() => onPageChange('profile')}
+          >
+            <i className="fas fa-cog"></i>
+            <span>설정</span>
+          </button>
         </div>
       </div>
     </nav>

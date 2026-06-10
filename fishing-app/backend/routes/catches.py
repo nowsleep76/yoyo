@@ -1,7 +1,8 @@
 from flask import Blueprint, request, jsonify
 from models.database import (
     add_catch_record, get_all_catches, get_catch_by_id, update_catch_record,
-    delete_catch_record, like_catch_record
+    delete_catch_record, like_catch_record, add_catch_favorite, remove_catch_favorite,
+    is_catch_favorited, get_favorite_catches
 )
 from collections import defaultdict
 
@@ -401,6 +402,63 @@ def get_count_rankings():
         # 마리수순 정렬
         rankings = [{'userId': user_id, 'count': count} for user_id, count in count_by_user.items()]
         rankings.sort(key=lambda x: x['count'], reverse=True)
+
+        return jsonify(rankings[:10]), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 400
+
+# ===== 게시물 즐겨찾기 API =====
+
+@catches_bp.route('/<int:catch_id>/favorite', methods=['POST'])
+def toggle_catch_favorite(catch_id):
+    """조과 즐겨찾기 토글"""
+    try:
+        if is_catch_favorited(catch_id):
+            remove_catch_favorite(catch_id)
+            return jsonify({'message': '즐겨찾기를 제거했습니다', 'favorited': False}), 200
+        else:
+            add_catch_favorite(catch_id)
+            return jsonify({'message': '즐겨찾기를 추가했습니다', 'favorited': True}), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 400
+
+@catches_bp.route('/favorites', methods=['GET'])
+def get_favorites():
+    """즐겨찾기한 조과 조회"""
+    try:
+        limit = request.args.get('limit', 50, type=int)
+        offset = request.args.get('offset', 0, type=int)
+
+        favorites = get_favorite_catches(limit=limit, offset=offset)
+
+        # 각 조과에 favorited 플래그 추가
+        for fav in favorites:
+            fav['favorited'] = True
+
+        return jsonify(favorites), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 400
+
+@catches_bp.route('/rankings/likes', methods=['GET'])
+def get_likes_rankings():
+    """좋아요 랭킹 - 게시물 좋아요 수 기준 (상위 10개)"""
+    try:
+        catches = get_all_catches(limit=1000)
+        public_catches = [c for c in catches if c.get('is_public')]
+
+        # 좋아요 기준 정렬
+        rankings = [
+            {
+                'id': catch.get('id'),
+                'species': catch.get('species', '-'),
+                'size': catch.get('size_cm'),
+                'userId': catch.get('user_id') or catch.get('user_nickname') or '익명',
+                'likes': catch.get('like_count', 0),
+                'spotName': catch.get('spot_name', '-')
+            }
+            for catch in public_catches
+        ]
+        rankings.sort(key=lambda x: x['likes'], reverse=True)
 
         return jsonify(rankings[:10]), 200
     except Exception as e:

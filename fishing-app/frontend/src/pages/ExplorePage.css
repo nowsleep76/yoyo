@@ -562,3 +562,132 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* ===== 어종별 필터 탭 스타일 ===== */
+.species-filter-container {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 15px;
+}
+
+.species-list-section {
+  background: white;
+  padding: 15px;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.species-list-section h3 {
+  margin: 0 0 10px 0;
+  font-size: 14px;
+  color: #333;
+}
+
+.species-checkboxes {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.species-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  cursor: pointer;
+  padding: 8px;
+  border-radius: 4px;
+  transition: background 0.2s;
+}
+
+.species-checkbox:hover {
+  background: #f5f5f5;
+}
+
+.species-checkbox input {
+  cursor: pointer;
+  width: 16px;
+  height: 16px;
+}
+
+.species-checkbox span {
+  font-size: 13px;
+  color: #333;
+  user-select: none;
+}
+
+.species-sort-section,
+.species-results-section {
+  background: white;
+  padding: 15px;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.species-sort-section h3,
+.species-results-section h3 {
+  margin: 0 0 10px 0;
+  font-size: 14px;
+  color: #333;
+}
+
+.sort-tabs {
+  display: flex;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.sort-tab {
+  padding: 8px 16px;
+  border: 1px solid #ddd;
+  background: white;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.sort-tab:hover {
+  border-color: #0066cc;
+  color: #0066cc;
+}
+
+.sort-tab.active {
+  background: #0066cc;
+  color: white;
+  border-color: #0066cc;
+}
+
+.catch-results-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 10px;
+  font-size: 12px;
+}
+
+.catch-results-table th,
+.catch-results-table td {
+  padding: 8px;
+  text-align: left;
+  border-bottom: 1px solid #eee;
+}
+
+.catch-results-table th {
+  background: #f5f5f5;
+  font-weight: 600;
+  color: #333;
+  border-bottom: 2px solid #ddd;
+}
+
+.catch-results-table tbody tr:hover {
+  background: #f9f9f9;
+}
+
+.empty-message {
+  padding: 40px 20px;
+  text-align: center;
+  color: #999;
+  font-size: 13px;
+}

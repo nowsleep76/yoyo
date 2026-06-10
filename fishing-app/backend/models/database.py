@@ -124,7 +124,7 @@ def init_db():
         )
     ''')
 
-    # 즐겨찾기 테이블
+    # 즐겨찾기 테이블 (낚시터)
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS favorite_spots (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -132,6 +132,32 @@ def init_db():
             spot_name TEXT,
             spot_type TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+
+    # 조과 즐겨찾기 테이블
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS catch_favorites (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            catch_id INTEGER NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY(catch_id) REFERENCES catch_records(id) ON DELETE CASCADE
+        )
+    ''')
+
+    # 사용자 정보 테이블
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id TEXT UNIQUE NOT NULL,
+            nickname TEXT NOT NULL,
+            preferred_rod TEXT,
+            preferred_reel TEXT,
+            preferred_line_weight TEXT,
+            preferred_leader TEXT,
+            preferred_species TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     ''')
 
@@ -497,6 +523,55 @@ def get_user_stats():
 
     grade = get_grade(score)
 
+    # 물때별 조과 분포
+    cursor = get_connection().cursor()
+    cursor.execute('''
+        SELECT tide_number, COUNT(*) as count FROM catch_records
+        WHERE tide_number IS NOT NULL
+        GROUP BY tide_number
+        ORDER BY tide_number
+    ''')
+    tide_data = {}
+    for row in cursor.fetchall():
+        tide_num = row['tide_number']
+        if tide_num <= 3:
+            category = '조금'
+        elif tide_num <= 7 or tide_num >= 13:
+            category = '중간'
+        else:
+            category = '사리'
+
+        if category not in tide_data:
+            tide_data[category] = 0
+        tide_data[category] += row['count']
+
+    # 어종별 조과 분포 (상위 5개)
+    cursor.execute('''
+        SELECT species, COUNT(*) as count FROM catch_records
+        GROUP BY species
+        ORDER BY count DESC
+        LIMIT 5
+    ''')
+    species_data = [{'name': row['species'], 'count': row['count']} for row in cursor.fetchall()]
+
+    # 시간대별 조과 분포
+    cursor.execute('''
+        SELECT
+            CASE
+                WHEN strftime('%H', hit_time) IS NULL THEN '미설정'
+                WHEN CAST(strftime('%H', hit_time) AS INTEGER) < 12 THEN '오전'
+                WHEN CAST(strftime('%H', hit_time) AS INTEGER) < 18 THEN '오후'
+                ELSE '저녁/야간'
+            END as time_category,
+            COUNT(*) as count
+        FROM catch_records
+        WHERE hit_time IS NOT NULL
+        GROUP BY time_category
+    ''')
+    time_data = {row[0]: row[1] for row in cursor.fetchall()}
+
+    conn.close()
+
     return {
         'total_catches': total,
         'avg_size': avg_size,
@@ -504,5 +579,247 @@ def get_user_stats():
         'like_count': total_likes,
         'favorite_species': favorite['species'] if favorite else None,
         'score': score,
-        'grade': grade
+        'grade': grade,
+        'tide_distribution': tide_data,
+        'species_distribution': species_data,
+        'time_distribution': time_data
+    }
+
+# ===== 조과 즐겨찾기 관련 함수 =====
+
+def add_catch_favorite(catch_id):
+    """조과 즐겨찾기 추가"""
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute('INSERT INTO catch_favorites (catch_id) VALUES (?)', (catch_id,))
+        conn.commit()
+        fav_id = cursor.lastrowid
+        conn.close()
+        return fav_id
+    except sqlite3.IntegrityError:
+        # 이미 즐겨찾기되어 있음
+        conn.close()
+        return None
+
+def remove_catch_favorite(catch_id):
+    """조과 즐겨찾기 제거"""
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute('DELETE FROM catch_favorites WHERE catch_id = ?', (catch_id,))
+    conn.commit()
+    conn.close()
+
+def is_catch_favorited(catch_id):
+    """조과가 즐겨찾기되었는지 확인"""
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute('SELECT id FROM catch_favorites WHERE catch_id = ?', (catch_id,))
+    result = cursor.fetchone()
+    conn.close()
+
+    return result is not None
+
+def get_favorite_catches(limit=50, offset=0):
+    """즐겨찾기한 조과 조회"""
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute('''
+        SELECT c.* FROM catch_records c
+        INNER JOIN catch_favorites f ON c.id = f.catch_id
+        ORDER BY f.created_at DESC
+        LIMIT ? OFFSET ?
+    ''', (limit, offset))
+
+    catches = [dict(row) for row in cursor.fetchall()]
+    conn.close()
+
+    return catches
+
+# ===== 사용자 관리 함수 =====
+
+def add_user(user_id, nickname, preferred_rod='', preferred_reel='', 
+             preferred_line_weight='', preferred_leader='', preferred_species=''):
+    """사용자 추가"""
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute('''
+            INSERT INTO users (user_id, nickname, preferred_rod, preferred_reel, 
+                              preferred_line_weight, preferred_leader, preferred_species)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        ''', (user_id, nickname, preferred_rod, preferred_reel, 
+              preferred_line_weight, preferred_leader, preferred_species))
+        
+        conn.commit()
+        user_id_result = cursor.lastrowid
+        conn.close()
+        return user_id_result
+    except sqlite3.IntegrityError:
+        conn.close()
+        return None
+
+def get_user(user_id):
+    """사용자 정보 조회"""
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute('SELECT * FROM users WHERE user_id = ?', (user_id,))
+    user = cursor.fetchone()
+    conn.close()
+
+    return dict(user) if user else None
+
+def update_user(user_id, **kwargs):
+    """사용자 정보 업데이트"""
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    allowed_fields = ['nickname', 'preferred_rod', 'preferred_reel', 
+                     'preferred_line_weight', 'preferred_leader', 'preferred_species']
+    
+    updates = {k: v for k, v in kwargs.items() if k in allowed_fields}
+    if not updates:
+        conn.close()
+        return False
+
+    updates['updated_at'] = datetime.now().isoformat()
+    
+    set_clause = ', '.join([f"{k} = ?" for k in updates.keys()])
+    values = list(updates.values()) + [user_id]
+    
+    cursor.execute(f'UPDATE users SET {set_clause} WHERE user_id = ?', values)
+    conn.commit()
+    conn.close()
+
+    return True
+
+def get_user_stats_filtered(user_id=None):
+    """사용자별 통계 조회"""
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    if user_id:
+        # 특정 사용자 통계
+        cursor.execute('SELECT COUNT(*) as total FROM catch_records WHERE user_nickname = ?', (user_id,))
+        total = cursor.fetchone()['total'] or 0
+
+        cursor.execute('SELECT AVG(size_cm) as avg_size FROM catch_records WHERE user_nickname = ?', (user_id,))
+        avg_size = cursor.fetchone()['avg_size'] or 0
+
+        cursor.execute('SELECT MAX(size_cm) as max_size FROM catch_records WHERE user_nickname = ?', (user_id,))
+        max_size = cursor.fetchone()['max_size'] or 0
+
+        cursor.execute('SELECT SUM(like_count) as total_likes FROM catch_records WHERE user_nickname = ?', (user_id,))
+        total_likes = cursor.fetchone()['total_likes'] or 0
+
+        cursor.execute('SELECT species, COUNT(*) as count FROM catch_records WHERE user_nickname = ? GROUP BY species ORDER BY count DESC LIMIT 1', (user_id,))
+        favorite = cursor.fetchone()
+    else:
+        # 전체 사용자 통계 (기존 함수와 동일)
+        cursor.execute('SELECT COUNT(*) as total FROM catch_records')
+        total = cursor.fetchone()['total'] or 0
+
+        cursor.execute('SELECT AVG(size_cm) as avg_size FROM catch_records')
+        avg_size = cursor.fetchone()['avg_size'] or 0
+
+        cursor.execute('SELECT MAX(size_cm) as max_size FROM catch_records')
+        max_size = cursor.fetchone()['max_size'] or 0
+
+        cursor.execute('SELECT SUM(like_count) as total_likes FROM catch_records')
+        total_likes = cursor.fetchone()['total_likes'] or 0
+
+        cursor.execute('SELECT species, COUNT(*) as count FROM catch_records GROUP BY species ORDER BY count DESC LIMIT 1')
+        favorite = cursor.fetchone()
+
+    # 물때별 조과 분포
+    cursor.execute('''
+        SELECT tide_number, COUNT(*) as count FROM catch_records
+        WHERE tide_number IS NOT NULL
+        ''' + ('AND user_nickname = ?' if user_id else '') + '''
+        GROUP BY tide_number
+        ORDER BY tide_number
+    ''', (user_id,) if user_id else ())
+    
+    tide_data = {}
+    for row in cursor.fetchall():
+        tide_num = row['tide_number']
+        if tide_num <= 3:
+            category = '조금'
+        elif tide_num <= 7 or tide_num >= 13:
+            category = '중간'
+        else:
+            category = '사리'
+
+        if category not in tide_data:
+            tide_data[category] = 0
+        tide_data[category] += row['count']
+
+    # 어종별 조과 분포
+    cursor.execute('''
+        SELECT species, COUNT(*) as count FROM catch_records
+        ''' + ('WHERE user_nickname = ?' if user_id else '') + '''
+        GROUP BY species
+        ORDER BY count DESC
+        LIMIT 5
+    ''', (user_id,) if user_id else ())
+    
+    species_data = [{'name': row['species'], 'count': row['count']} for row in cursor.fetchall()]
+
+    # 시간대별 조과 분포
+    cursor.execute('''
+        SELECT
+            CASE
+                WHEN strftime('%H', caught_at) IS NULL THEN '미설정'
+                WHEN CAST(strftime('%H', caught_at) AS INTEGER) < 12 THEN '오전'
+                WHEN CAST(strftime('%H', caught_at) AS INTEGER) < 18 THEN '오후'
+                ELSE '저녁/야간'
+            END as time_category,
+            COUNT(*) as count
+        FROM catch_records
+        WHERE caught_at IS NOT NULL
+        ''' + ('AND user_nickname = ?' if user_id else '') + '''
+        GROUP BY time_category
+    ''', (user_id,) if user_id else ())
+    
+    time_data = {row[0]: row[1] for row in cursor.fetchall()}
+
+    conn.close()
+
+    # 점수 계산
+    score = int((total * 10) + (max_size * 2) + (avg_size * 5) + (total_likes * 5))
+
+    # 등급 결정
+    def get_grade(score):
+        if score < 51:
+            return {'emoji': '🎣', 'name': '막내 낚시꾼', 'desc': '이제 시작이에요!'}
+        elif score < 151:
+            return {'emoji': '🌊', 'name': '물때 배우는중', 'desc': '물때 감을 익혀요!'}
+        elif score < 301:
+            return {'emoji': '🎯', 'name': '묵직한 손맛', 'desc': '조황을 알아요!'}
+        elif score < 501:
+            return {'emoji': '👑', 'name': '대물사냥꾼', 'desc': '큰 고기가 나를 부릅니다!'}
+        elif score < 801:
+            return {'emoji': '🏆', 'name': '낚시의 신', 'desc': '바다가 나를 따라요!'}
+        else:
+            return {'emoji': '👨‍⚓', 'name': '영광의 어사', 'desc': '낚시의 전설입니다!'}
+
+    grade = get_grade(score)
+
+    return {
+        'total_catches': total,
+        'avg_size': avg_size,
+        'max_size': max_size,
+        'like_count': total_likes,
+        'favorite_species': favorite['species'] if favorite else None,
+        'score': score,
+        'grade': grade,
+        'tide_distribution': tide_data,
+        'species_distribution': species_data,
+        'time_distribution': time_data
     }

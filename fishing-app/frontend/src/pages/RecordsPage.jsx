@@ -1,9 +1,11 @@
 import { useState, useEffect, useRef } from 'react'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
+import { StorageUtils } from '../utils/storage'
 import './RecordsPage.css'
 
-function RecordsPage({ location }) {
+function RecordsPage({ location, userId }) {
   const [activeTab, setActiveTab] = useState('records')
   const [recordsDisplayMode, setRecordsDisplayMode] = useState('list') // 'list' or 'sns'
   const [showNewRecordForm, setShowNewRecordForm] = useState(false)
@@ -20,7 +22,11 @@ function RecordsPage({ location }) {
   const [gradeRankings, setGradeRankings] = useState([])
   const [maxSizeRankings, setMaxSizeRankings] = useState([])
   const [countRankings, setCountRankings] = useState([])
+  const [likesRankings, setLikesRankings] = useState([])
   const [rankingsLoading, setRankingsLoading] = useState(false)
+
+  // 게시물 즐겨찾기 상태
+  const [favoriteCatchIds, setFavoriteCatchIds] = useState(new Set())
 
   // 새 기록 입력 상태
   const [selectedLocation, setSelectedLocation] = useState(() => ({
@@ -67,10 +73,11 @@ function RecordsPage({ location }) {
     const fetchData = async () => {
       try {
         setLoading(true)
-        const recordsRes = await fetch('/api/catches')
+        const recordsRes = await fetch('/api/catches?limit=200')
         const historyRes = await fetch('/api/user/history')
         const favoritesRes = await fetch('/api/user/favorite-spots')
-        const statsRes = await fetch('/api/user/stats')
+        const statsUrl = userId ? `/api/user/stats?user_id=${userId}` : '/api/user/stats'
+        const statsRes = await fetch(statsUrl)
 
         if (recordsRes.ok) {
           const records = await recordsRes.json()
@@ -116,11 +123,16 @@ function RecordsPage({ location }) {
       }
     }
 
-    // 자동완성 초기화 함수
+    // 자동완성 초기화 함수 (StorageUtils 사용)
     const initializeSuggestions = (records) => {
-      const savedSuggestions = localStorage.getItem('fishingAppSuggestions')
+      const savedSuggestions = StorageUtils.getItem('fishingAppSuggestions')
       if (savedSuggestions) {
-        setSuggestions(JSON.parse(savedSuggestions))
+        try {
+          setSuggestions(JSON.parse(savedSuggestions))
+        } catch (e) {
+          console.warn('저장된 자동완성 데이터 파싱 실패:', e)
+          setSuggestions({})
+        }
       } else {
         const newSuggestions = {
           species: [...new Set(records.map(r => r.species).filter(Boolean))],
@@ -131,13 +143,38 @@ function RecordsPage({ location }) {
           rigMethod: [...new Set(records.map(r => r.rig_method).filter(Boolean))]
         }
         setSuggestions(newSuggestions)
-        localStorage.setItem('fishingAppSuggestions', JSON.stringify(newSuggestions))
+        const saved = StorageUtils.setItem('fishingAppSuggestions', JSON.stringify(newSuggestions))
+        if (!saved) {
+          console.warn('자동완성 데이터 저장 실패')
+        }
       }
 
-      // 사용자 닉네임 로드
-      const savedNickname = localStorage.getItem('userNickname')
-      if (savedNickname) {
-        setFormData(prev => ({...prev, user_nickname: savedNickname}))
+      // 프로필 데이터 로드해서 기본값 설정
+      if (userId) {
+        fetch(`/api/user/profile?user_id=${userId}`)
+          .then(res => res.ok ? res.json() : null)
+          .then(profile => {
+            if (profile) {
+              const nickname = profile.nickname || ''
+              setFormData(prev => ({
+                ...prev,
+                user_nickname: nickname,
+                rod: profile.preferred_rod || '',
+                reel: profile.preferred_reel || '',
+                line_weight: profile.preferred_line_weight || '',
+                leader: profile.preferred_leader || ''
+              }))
+              // 기록을 현재 사용자의 닉네임으로 필터링
+              setRecords(prev => prev.filter(r => r.user_nickname === nickname))
+            }
+          })
+          .catch(err => console.log('프로필 로드 실패:', err))
+      } else {
+        // 사용자 ID가 없으면 StorageUtils에서 닉네임 로드
+        const savedNickname = StorageUtils.getItem('userNickname')
+        if (savedNickname) {
+          setFormData(prev => ({...prev, user_nickname: savedNickname}))
+        }
       }
     }
 
@@ -344,7 +381,7 @@ function RecordsPage({ location }) {
                       value={formData.user_nickname}
                       onChange={(e) => {
                         setFormData({...formData, user_nickname: e.target.value})
-                        localStorage.setItem('userNickname', e.target.value)
+                        StorageUtils.setItem('userNickname', e.target.value)
                       }}
                       className="form-input"
                     />
@@ -590,7 +627,10 @@ function RecordsPage({ location }) {
                           ? [formData.rig_method, ...suggestions.rigMethod].slice(0, 10)
                           : suggestions.rigMethod
                       }
-                      localStorage.setItem('fishingAppSuggestions', JSON.stringify(updatedSuggestions))
+                      const saved = StorageUtils.setItem('fishingAppSuggestions', JSON.stringify(updatedSuggestions))
+                      if (!saved) {
+                        console.warn('자동완성 데이터 저장 실패')
+                      }
 
                       // 히트 일시 조합 (날짜 + 시간)
                       let caughtAt = formData.hit_date
@@ -736,6 +776,12 @@ function RecordsPage({ location }) {
                             <span className="stat">🌊 {record.tide_number ? `${record.tide_number}물` : '-'}</span>
                             <span className="stat">📊 {record.water_level ? `${record.water_level.toFixed(1)}m` : '-'}</span>
                           </div>
+                          <div className="card-env-info">
+                            {record.water_temp && <span className="env-badge">🌡️ {record.water_temp}°C</span>}
+                            {record.wind_speed && <span className="env-badge">💨 {record.wind_speed}m/s</span>}
+                            {record.tidal_current && <span className="env-badge">⚡ 조류 {record.tidal_current}</span>}
+                            {record.weather_condition && <span className="env-badge">☀️ {record.weather_condition}</span>}
+                          </div>
                           <p className="card-description">{record.description || record.spot_name || '설명 없음'}</p>
                           <div className="card-location">
                             <i className="fas fa-map-marker-alt"></i>
@@ -848,50 +894,109 @@ function RecordsPage({ location }) {
         </>
       )}
 
-      {!loading && activeTab === 'history' && (
-        <div className="history-list">
-          {history.length === 0 ? (
-            <div className="empty-message">
-              <i className="fas fa-inbox"></i>
-              <p>방문 이력이 없습니다</p>
-            </div>
-          ) : (
-            history.map((item) => (
-              <div key={item.id} className="history-item">
-                <div className="history-info">
-                  <h3>{item.spot_name}</h3>
-                  <p className="detail">{item.visited_at}</p>
-                  <p className="detail">조과: {item.catch_count}마리</p>
-                </div>
-              </div>
-            ))
-          )}
-        </div>
-      )}
+      {!loading && activeTab === 'history' && (() => {
+        // 기록 데이터로부터 방문 이력 생성
+        const visitMap = {}
+        records.forEach(record => {
+          const spot = record.spot_name || '미정'
+          if (!visitMap[spot]) {
+            visitMap[spot] = {
+              spot_name: spot,
+              count: 0,
+              dates: [],
+              totalSize: 0,
+              species: []
+            }
+          }
+          visitMap[spot].count += 1
+          visitMap[spot].totalSize += record.size_cm || 0
+          if (record.caught_at) {
+            visitMap[spot].dates.push(new Date(record.caught_at))
+          }
+          if (record.species && !visitMap[spot].species.includes(record.species)) {
+            visitMap[spot].species.push(record.species)
+          }
+        })
 
-      {!loading && activeTab === 'favorites' && (
-        <div className="favorites-list">
-          {favorites.length === 0 ? (
-            <div className="empty-message">
-              <i className="fas fa-inbox"></i>
-              <p>즐겨찾기가 없습니다</p>
-            </div>
-          ) : (
-            favorites.map((item) => (
-              <div key={item.id} className="favorite-item">
-                <div className="favorite-info">
-                  <h3>{item.name}</h3>
-                  <p className="detail">{item.region || '지역 정보'}</p>
-                  <p className="detail">어종: {item.fish_types || '-'}</p>
-                </div>
-                <button className="btn-unfavorite">
-                  <i className="fas fa-star"></i>
-                </button>
+        const visitHistory = Object.values(visitMap).sort((a, b) => {
+          const aDate = a.dates.length > 0 ? Math.max(...a.dates) : 0
+          const bDate = b.dates.length > 0 ? Math.max(...b.dates) : 0
+          return bDate - aDate
+        })
+
+        return (
+          <div className="history-list">
+            {visitHistory.length === 0 ? (
+              <div className="empty-message">
+                <i className="fas fa-inbox"></i>
+                <p>방문 이력이 없습니다</p>
               </div>
-            ))
-          )}
-        </div>
-      )}
+            ) : (
+              visitHistory.map((item, idx) => (
+                <div key={idx} className="history-item">
+                  <div className="history-header">
+                    <h3>{item.spot_name}</h3>
+                    <span className="visit-count">{item.count}회</span>
+                  </div>
+                  <div className="history-details">
+                    <p className="detail">방문 날짜: {item.dates.length > 0 ? new Date(Math.max(...item.dates)).toLocaleDateString('ko-KR') : '-'}</p>
+                    <p className="detail">조과: {item.count}마리 (평균 {(item.totalSize / item.count).toFixed(1)}cm)</p>
+                    <p className="detail">주요 어종: {item.species.slice(0, 3).join(', ')}</p>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        )
+      })()}
+
+      {!loading && activeTab === 'favorites' && (() => {
+        // Favorited된 기록만 필터링
+        const favoritedRecords = records.filter(r => r.is_favorited || favoriteCatchIds.has(r.id))
+
+        return (
+          <div className="favorites-list">
+            {favoritedRecords.length === 0 ? (
+              <div className="empty-message">
+                <i className="fas fa-inbox"></i>
+                <p>즐겨찾기 게시물이 없습니다</p>
+              </div>
+            ) : (
+              <div className="favorite-grid">
+                {favoritedRecords.map((record) => {
+                  const caughtDate = record.caught_at ? new Date(record.caught_at) : null
+                  return (
+                    <div key={record.id} className="favorite-card" onClick={() => setSelectedRecordId(record.id)}>
+                      <div className="favorite-image">
+                        <div className="placeholder-image">
+                          <i className="fas fa-image"></i>
+                        </div>
+                        <button
+                          className="btn-favorite"
+                          title="즐겨찾기 해제"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            // 즐겨찾기 해제
+                          }}
+                        >
+                          <i className="fas fa-star"></i>
+                        </button>
+                      </div>
+                      <div className="favorite-info">
+                        <h3>{record.species}</h3>
+                        <p className="user">{record.user_nickname || '익명'}</p>
+                        <p className="date">{caughtDate ? caughtDate.toLocaleDateString('ko-KR') : '-'}</p>
+                        <p className="size">크기: {record.size_cm ? `${record.size_cm}cm` : '-'}</p>
+                        <p className="location">{record.spot_name || '-'}</p>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        )
+      })()}
 
       {!loading && activeTab === 'stats' && (
         <div className="stats-section">
@@ -937,6 +1042,152 @@ function RecordsPage({ location }) {
                   <div className="score-progress" style={{width: `${Math.min((myStats.score || 0) / 10, 100)}%`}}></div>
                 </div>
                 <p className="score-text">{myStats.score || 0}점 / 1000점</p>
+              </div>
+
+              <div className="charts-section">
+                {(() => {
+                  // 데이터 분석 함수들
+                  const getTideData = () => {
+                    const tideMap = {}
+                    records.forEach(r => {
+                      if (r.tide_number) {
+                        const tide = `${r.tide_number}물`
+                        tideMap[tide] = (tideMap[tide] || 0) + 1
+                      }
+                    })
+                    return Object.entries(tideMap).map(([name, count]) => ({ name, 건수: count }))
+                  }
+
+                  const getTempData = () => {
+                    const tempMap = {}
+                    records.forEach(r => {
+                      if (r.water_temp) {
+                        const temp = Math.round(r.water_temp / 2) * 2
+                        const label = `${temp}°C`
+                        tempMap[label] = (tempMap[label] || 0) + 1
+                      }
+                    })
+                    return Object.entries(tempMap).sort((a, b) => parseInt(a[0]) - parseInt(b[0])).map(([name, count]) => ({ name, 건수: count }))
+                  }
+
+                  const getLocationData = () => {
+                    const locMap = {}
+                    records.forEach(r => {
+                      const loc = r.spot_name || '미정'
+                      locMap[loc] = (locMap[loc] || 0) + 1
+                    })
+                    return Object.entries(locMap).sort((a, b) => b[1] - a[1]).slice(0, 10).map(([name, count]) => ({ name, 건수: count }))
+                  }
+
+                  const getTimeData = () => {
+                    const timeMap = { '오전(5-11)': 0, '오후(12-17)': 0, '저녁(18-23)': 0 }
+                    records.forEach(r => {
+                      if (r.caught_at) {
+                        const hour = new Date(r.caught_at).getHours()
+                        if (hour < 12) timeMap['오전(5-11)']++
+                        else if (hour < 18) timeMap['오후(12-17)']++
+                        else timeMap['저녁(18-23)']++
+                      }
+                    })
+                    return Object.entries(timeMap).map(([name, count]) => ({ name, 건수: count }))
+                  }
+
+                  const getSpeciesData = () => {
+                    const specMap = {}
+                    records.forEach(r => {
+                      if (r.species) {
+                        specMap[r.species] = (specMap[r.species] || 0) + 1
+                      }
+                    })
+                    return Object.entries(specMap).sort((a, b) => b[1] - a[1]).slice(0, 8).map(([name, count]) => ({ name, 건수: count }))
+                  }
+
+                  const chartHeight = 300
+                  const tideData = getTideData()
+                  const tempData = getTempData()
+                  const locationData = getLocationData()
+                  const timeData = getTimeData()
+                  const speciesData = getSpeciesData()
+
+                  return (
+                    <>
+                      {tideData.length > 0 && (
+                        <div className="chart-container">
+                          <h4>물때별 조과</h4>
+                          <ResponsiveContainer width="100%" height={chartHeight}>
+                            <BarChart data={tideData}>
+                              <CartesianGrid strokeDasharray="3 3" />
+                              <XAxis dataKey="name" />
+                              <YAxis />
+                              <Tooltip />
+                              <Bar dataKey="건수" fill="#8884d8" />
+                            </BarChart>
+                          </ResponsiveContainer>
+                        </div>
+                      )}
+
+                      {tempData.length > 0 && (
+                        <div className="chart-container">
+                          <h4>수온별 조과</h4>
+                          <ResponsiveContainer width="100%" height={chartHeight}>
+                            <BarChart data={tempData}>
+                              <CartesianGrid strokeDasharray="3 3" />
+                              <XAxis dataKey="name" />
+                              <YAxis />
+                              <Tooltip />
+                              <Bar dataKey="건수" fill="#82ca9d" />
+                            </BarChart>
+                          </ResponsiveContainer>
+                        </div>
+                      )}
+
+                      {locationData.length > 0 && (
+                        <div className="chart-container">
+                          <h4>위치별 조과 (상위 10개)</h4>
+                          <ResponsiveContainer width="100%" height={chartHeight}>
+                            <BarChart data={locationData}>
+                              <CartesianGrid strokeDasharray="3 3" />
+                              <XAxis dataKey="name" angle={-45} textAnchor="end" height={80} />
+                              <YAxis />
+                              <Tooltip />
+                              <Bar dataKey="건수" fill="#ffc658" />
+                            </BarChart>
+                          </ResponsiveContainer>
+                        </div>
+                      )}
+
+                      {timeData.length > 0 && (
+                        <div className="chart-container">
+                          <h4>시간대별 조과</h4>
+                          <ResponsiveContainer width="100%" height={chartHeight}>
+                            <BarChart data={timeData}>
+                              <CartesianGrid strokeDasharray="3 3" />
+                              <XAxis dataKey="name" />
+                              <YAxis />
+                              <Tooltip />
+                              <Bar dataKey="건수" fill="#ff7c7c" />
+                            </BarChart>
+                          </ResponsiveContainer>
+                        </div>
+                      )}
+
+                      {speciesData.length > 0 && (
+                        <div className="chart-container">
+                          <h4>어종별 조과 (상위 8개)</h4>
+                          <ResponsiveContainer width="100%" height={chartHeight}>
+                            <BarChart data={speciesData}>
+                              <CartesianGrid strokeDasharray="3 3" />
+                              <XAxis dataKey="name" angle={-45} textAnchor="end" height={80} />
+                              <YAxis />
+                              <Tooltip />
+                              <Bar dataKey="건수" fill="#8dd1e1" />
+                            </BarChart>
+                          </ResponsiveContainer>
+                        </div>
+                      )}
+                    </>
+                  )
+                })()}
               </div>
             </div>
           ) : (

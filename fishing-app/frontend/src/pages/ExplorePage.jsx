@@ -20,6 +20,11 @@ function ExplorePage({ location, onLocationChange }) {
   const [planResults, setPlanResults] = useState([])
   const [planLoading, setPlanLoading] = useState(false)
 
+  // 어종별 필터 탭 상태
+  const [speciesFilter, setSpeciesFilter] = useState(new Set())
+  const [speciesFilterSort, setSpeciesFilterSort] = useState('latest')
+  const [filteredCatches, setFilteredCatches] = useState([])
+
   const mapRef = useRef(null)
   const mapInstanceRef = useRef(null)
   const markersRef = useRef([])
@@ -48,6 +53,34 @@ function ExplorePage({ location, onLocationChange }) {
 
     fetchCatches()
   }, [filterType])
+
+  // 어종 목록 추출
+  const getSpeciesList = () => {
+    const species = new Set()
+    allCatches.forEach(item => {
+      if (item.species) species.add(item.species)
+    })
+    return Array.from(species).sort()
+  }
+
+  // 어종 필터링 & 정렬
+  useEffect(() => {
+    let result = allCatches
+
+    // 1. 어종 필터링
+    if (speciesFilter.size > 0) {
+      result = result.filter(item => speciesFilter.has(item.species))
+    }
+
+    // 2. 정렬
+    if (speciesFilterSort === 'latest') {
+      result.sort((a, b) => new Date(b.caught_at) - new Date(a.caught_at))
+    } else if (speciesFilterSort === 'region') {
+      result.sort((a, b) => (a.spot_name || '').localeCompare(b.spot_name || '', 'ko'))
+    }
+
+    setFilteredCatches(result)
+  }, [allCatches, speciesFilter, speciesFilterSort])
 
   // Haversine 거리 계산
   const haversineDistance = (lat1, lng1, lat2, lng2) => {
@@ -273,6 +306,13 @@ function ExplorePage({ location, onLocationChange }) {
           <i className="fas fa-calendar-alt"></i>
           출조 계획
         </button>
+        <button
+          className={`explore-tab ${activeTab === 'species' ? 'active' : ''}`}
+          onClick={() => setActiveTab('species')}
+        >
+          <i className="fas fa-fish"></i>
+          어종별
+        </button>
       </div>
 
       {/* 기록 탭 */}
@@ -477,6 +517,90 @@ function ExplorePage({ location, onLocationChange }) {
           </div>
         )}
       </div>
+      )}
+
+      {/* 어종별 탭 */}
+      {activeTab === 'species' && (
+        <div className="explore-container">
+          <div className="species-filter-container">
+            {/* 1. 어종 체크박스 섹션 */}
+            <div className="species-list-section">
+              <h3>어종 선택</h3>
+              <div className="species-checkboxes">
+                {getSpeciesList().map(species => (
+                  <label key={species} className="species-checkbox">
+                    <input
+                      type="checkbox"
+                      checked={speciesFilter.has(species)}
+                      onChange={(e) => {
+                        const newSet = new Set(speciesFilter)
+                        if (e.target.checked) newSet.add(species)
+                        else newSet.delete(species)
+                        setSpeciesFilter(newSet)
+                      }}
+                    />
+                    <span>{species}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {/* 2. 정렬 옵션 */}
+            <div className="species-sort-section">
+              <h3>정렬</h3>
+              <div className="sort-tabs">
+                <button
+                  className={`sort-tab ${speciesFilterSort === 'latest' ? 'active' : ''}`}
+                  onClick={() => setSpeciesFilterSort('latest')}
+                >
+                  최신순
+                </button>
+                <button
+                  className={`sort-tab ${speciesFilterSort === 'region' ? 'active' : ''}`}
+                  onClick={() => setSpeciesFilterSort('region')}
+                >
+                  지역별
+                </button>
+              </div>
+            </div>
+
+            {/* 3. 결과 리스트 */}
+            <div className="species-results-section">
+              <h3>검색 결과 ({filteredCatches.length}개)</h3>
+
+              {filteredCatches.length === 0 ? (
+                <div className="empty-message">
+                  {speciesFilter.size === 0
+                    ? '어종을 선택해주세요'
+                    : '선택한 어종의 기록이 없습니다'}
+                </div>
+              ) : (
+                <table className="catch-results-table">
+                  <thead>
+                    <tr>
+                      <th>어종</th>
+                      <th>크기</th>
+                      <th>위치</th>
+                      <th>날짜</th>
+                      <th>물때</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredCatches.map(item => (
+                      <tr key={item.id}>
+                        <td><strong>{item.species}</strong></td>
+                        <td>{item.size_cm ? `${item.size_cm}cm` : '-'}</td>
+                        <td>{item.spot_name}</td>
+                        <td>{new Date(item.caught_at).toLocaleDateString('ko-KR')}</td>
+                        <td>{item.tide_number ? `${item.tide_number}물` : '-'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )
