@@ -178,16 +178,117 @@
   color: #666;
 }
 
-/* 날짜 선택 */
-/* 날짜 선택 & 탭 바 통합 */
+/* 날짜 제어 & 탭 바 통합 */
 .date-tab-bar {
   display: flex;
+  flex-direction: column;
   gap: 0;
   background: white;
-  border-bottom: 2px solid #e0e0e0;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-  flex-wrap: wrap;
 }
+
+/* 날짜 제어 바 */
+.date-control-bar {
+  display: flex;
+  gap: 12px;
+  padding: 10px 12px;
+  background: #f9fafb;
+  border-bottom: 1px solid #e0e0e0;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: space-between;
+}
+
+.quick-date-buttons {
+  display: flex;
+  gap: 6px;
+}
+
+.quick-date-btn {
+  padding: 6px 12px;
+  border: 1px solid #ddd;
+  background: white;
+  color: #666;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.quick-date-btn:hover {
+  border-color: #0066cc;
+  color: #0066cc;
+  background: #f0f7ff;
+}
+
+.quick-date-btn.active {
+  background: #0066cc;
+  color: white;
+  border-color: #0066cc;
+}
+
+.nav-icon-buttons {
+  display: flex;
+  gap: 4px;
+}
+
+.nav-icon-btn {
+  padding: 6px 10px;
+  border: 1px solid #ddd;
+  background: white;
+  color: #333;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  transition: all 0.2s;
+  min-width: 35px;
+  text-align: center;
+}
+
+.nav-icon-btn:hover {
+  border-color: #0066cc;
+  background: #f0f7ff;
+}
+
+.calendar-btn {
+  font-size: 16px;
+}
+
+.interval-buttons {
+  display: flex;
+  gap: 6px;
+}
+
+.interval-btn {
+  padding: 6px 12px;
+  border: 1px solid #ddd;
+  background: white;
+  color: #666;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.interval-btn:hover {
+  border-color: #1976d2;
+  color: #1976d2;
+  background: #f0f7ff;
+}
+
+.interval-btn.active {
+  background: #1976d2;
+  color: white;
+  border-color: #1976d2;
+}
+
+/* 날짜 선택 */
+/* 날짜 선택 & 탭 바 통합 */
 
 .date-selector {
   display: flex;
@@ -407,38 +508,22 @@
 /* 수위 셀 */
 .height-cell {
   min-width: 90px;
-  font-weight: 700;
+  font-weight: 600;
   color: #0066cc;
   font-size: 12px;
   white-space: nowrap;
+  text-align: center;
 }
 
-.height-value {
-  font-weight: 700;
-  color: #0066cc;
-}
-
-.change-badge {
-  display: inline-block;
-  padding: 2px 5px;
-  border-radius: 3px;
-  font-weight: 600;
-  font-size: 10px;
-  white-space: nowrap;
-}
-
-.change-badge.up {
-  background: #e8f5e9;
-  color: #2e7d32;
-}
-
-.change-badge.down {
-  background: #ffebee;
+.height-cell.height-change.increase {
   color: #d32f2f;
 }
 
-.change-badge.flat {
-  background: #f5f5f5;
+.height-cell.height-change.decrease {
+  color: #1976d2;
+}
+
+.height-cell.height-change.flat {
   color: #888;
 }
 
@@ -474,21 +559,23 @@
 
 /* 조류 세기 셀 */
 .current-cell {
-  min-width: 60px;
+  min-width: 85px;
   padding: 2px;
   white-space: nowrap;
+  font-size: 11px;
+  text-align: center;
 }
 
 .current-bar-container {
   position: relative;
   width: 100%;
-  height: 20px;
+  height: 18px;
   background: #f0f0f0;
   border-radius: 2px;
   overflow: hidden;
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  vertical-align: middle;
+  margin-bottom: 2px;
 }
 
 .current-bar {
@@ -503,8 +590,8 @@
   left: 50%;
   top: 50%;
   transform: translate(-50%, -50%);
-  font-size: 8px;
-  font-weight: 700;
+  font-size: 9px;
+  font-weight: 600;
   color: #333;
   text-shadow: 0 0 2px white;
   white-space: nowrap;
@@ -512,15 +599,12 @@
 
 /* 바람 속도 셀 */
 .wind-cell {
-  min-width: 55px;
+  min-width: 75px;
   white-space: nowrap;
-}
-
-.wind-value {
-  font-size: 10px;
-  font-weight: 600;
+  font-size: 11px;
+  text-align: center;
   color: #ff9800;
-  display: inline;
+  font-weight: 600;
 }
 
 /* 파고 셀 */
@@ -592,27 +676,30 @@
 
 /* 만조/간조 셀 */
 .tide-cell {
-  min-width: 65px;
+  min-width: 100px;
+  font-size: 11px;
   white-space: nowrap;
+  text-align: center;
 }
 
-.tide-badge {
-  display: inline-block;
-  padding: 2px 5px;
-  border-radius: 3px;
-  font-weight: 600;
-  font-size: 10px;
-  white-space: nowrap;
-}
-
-.tide-badge.high {
-  background: #ffebee;
+.tide-cell.tide-high {
   color: #d32f2f;
 }
 
-.tide-badge.low {
-  background: #e3f2fd;
+.tide-cell.tide-low {
   color: #1976d2;
+}
+
+.tide-up {
+  color: #d32f2f;
+  margin-left: 4px;
+  font-weight: 600;
+}
+
+.tide-down {
+  color: #1976d2;
+  margin-left: 4px;
+  font-weight: 600;
 }
 
 /* 지도 섹션 */

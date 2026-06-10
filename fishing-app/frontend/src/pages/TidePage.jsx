@@ -1,44 +1,64 @@
 import { useEffect, useState, useRef } from 'react'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
+import { StorageUtils, SafeFetch } from '../utils/storage'
 import './TidePage.css'
 
 function TidePage({ location, onLocationChange }) {
   const [selectedDate, setSelectedDate] = useState(new Date())
   const [hourlyData, setHourlyData] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [dateList, setDateList] = useState([])
+  const [error, setError] = useState(null)
   const [showLocationSelector, setShowLocationSelector] = useState(false)
   const [selectedRegion, setSelectedRegion] = useState(null)
   const [spots, setSpots] = useState([])
-  const [displayLocation, setDisplayLocation] = useState(location)
+  // ✅ FIX: displayLocation 초기화를 lazy initializer에서 처리 (StorageUtils 사용)
+  const [displayLocation, setDisplayLocation] = useState(() => {
+    const saved = StorageUtils.getItem('selectedLocation')
+    if (saved) {
+      try {
+        return JSON.parse(saved)
+      } catch (e) {
+        console.warn('저장된 위치 파싱 실패:', e)
+      }
+    }
+    // 기본값으로 기본 좌표 반환 (location prop이 아직 available하지 않을 수 있음)
+    return {
+      latitude: 37.5665,
+      longitude: 126.9780,
+      name: '내 위치'
+    }
+  })
   const [activeTab, setActiveTab] = useState('tide')
+  const [displayInterval, setDisplayInterval] = useState(1) // 1시간 또는 3시간
 
   const mapRef = useRef(null)
   const mapInstanceRef = useRef(null)
+  const dateInputRef = useRef(null)
 
-  // 위치 정보 로드
+  // ✅ FIX: 저장된 위치를 App에 한 번만 반영 (마운트 시에만, StorageUtils 사용)
   useEffect(() => {
-    const savedLocation = localStorage.getItem('selectedLocation')
-    if (savedLocation) {
+    const saved = StorageUtils.getItem('selectedLocation')
+    if (saved && onLocationChange) {
       try {
-        const loc = JSON.parse(savedLocation)
-        setDisplayLocation(loc)
-        if (onLocationChange) {
-          onLocationChange(loc)
-        }
+        const loc = JSON.parse(saved)
+        onLocationChange(loc)
       } catch (err) {
         console.error('위치 로드 실패:', err)
-        setDisplayLocation(location)
       }
-    } else {
-      setDisplayLocation(location)
     }
   }, [])
 
+  // ✅ FIX: 값 비교 기반 setState (참조 변경만으로는 업데이트 안 함)
   useEffect(() => {
-    if (location && location.latitude && location.longitude) {
-      setDisplayLocation(location)
+    if (location?.latitude && location?.longitude) {
+      setDisplayLocation(prev => {
+        // 값이 실제로 다를 때만 업데이트
+        if (prev?.latitude === location.latitude && prev?.longitude === location.longitude) {
+          return prev // 변경 없음
+        }
+        return location
+      })
     }
   }, [location])
 
@@ -64,17 +84,6 @@ function TidePage({ location, onLocationChange }) {
     fetchSpots()
   }, [])
 
-  // 날짜 목록 생성
-  useEffect(() => {
-    const dates = []
-    for (let i = 0; i < 10; i++) {
-      const date = new Date()
-      date.setDate(date.getDate() + i)
-      dates.push(date)
-    }
-    setDateList(dates)
-  }, [])
-
   // 조위 데이터 페칭
   useEffect(() => {
     if (!selectedDate || !displayLocation || !displayLocation.latitude) {
@@ -84,6 +93,7 @@ function TidePage({ location, onLocationChange }) {
     const fetchHourlyData = async () => {
       try {
         setLoading(true)
+        setError(null)
         const dateStr = selectedDate.toISOString().split('T')[0]
 
         const response = await fetch(
@@ -91,27 +101,50 @@ function TidePage({ location, onLocationChange }) {
         )
 
         if (!response.ok) {
-          throw new Error('데이터 로드 실패')
+          throw new Error(`HTTP ${response.status}: 데이터 로드 실패`)
         }
 
         const data = await response.json()
         if (data && data.hourly) {
           setHourlyData(data)
+          setError(null)
+        } else {
+          throw new Error('응답 데이터 형식이 올바르지 않습니다')
         }
       } catch (err) {
-        console.error('데이터 로드 실패:', err)
+        console.error('조위 데이터 로드 실패:', err)
+        setError(`데이터를 불러올 수 없습니다: ${err.message}`)
+        setHourlyData(null)
       } finally {
         setLoading(false)
       }
     }
 
     fetchHourlyData()
-  }, [selectedDate, displayLocation])
 
-  // 위치 변경 처리
+    // 데이터 검증 로깅
+    if (hourlyData) {
+      console.log('📊 [실시간 데이터 검증]')
+      console.log('  날짜:', hourlyData.date)
+      console.log('  위치:', { lat: hourlyData.location.latitude, lon: hourlyData.location.longitude })
+      console.log('  물때:', hourlyData.tideNumber)
+      console.log('  일출:', hourlyData.sunrise, '일몰:', hourlyData.sunset)
+      console.log('  만조:', hourlyData.highTides?.map(t => t.time))
+      console.log('  간조:', hourlyData.lowTides?.map(t => t.time))
+      console.log('  시간 데이터 샘플 (0시, 12시):', [
+        hourlyData.hourly?.[0],
+        hourlyData.hourly?.[12]
+      ])
+    }
+  }, [selectedDate, displayLocation?.latitude, displayLocation?.longitude])
+
+  // 위치 변경 처리 (StorageUtils 사용)
   const handleLocationChange = (newLocation) => {
     setDisplayLocation(newLocation)
-    localStorage.setItem('selectedLocation', JSON.stringify(newLocation))
+    const saved = StorageUtils.setItem('selectedLocation', JSON.stringify(newLocation))
+    if (!saved) {
+      console.warn('위치 저장 실패 - 메모리에만 유지됩니다')
+    }
     if (onLocationChange) {
       onLocationChange(newLocation)
     }
@@ -157,10 +190,35 @@ function TidePage({ location, onLocationChange }) {
         mapInstanceRef.current = null
       }
     }
-  }, [displayLocation])
+  }, [displayLocation?.latitude, displayLocation?.longitude])
 
   if (!displayLocation || !displayLocation.latitude) {
     return <div className="tide-page loading">위치 정보를 불러오는 중...</div>
+  }
+
+  if (error) {
+    return (
+      <div className="tide-page error">
+        <div style={{ padding: '20px', textAlign: 'center', color: '#d32f2f' }}>
+          <h2>⚠️ 오류 발생</h2>
+          <p>{error}</p>
+          <button
+            onClick={() => window.location.reload()}
+            style={{
+              marginTop: '10px',
+              padding: '8px 16px',
+              backgroundColor: '#1976d2',
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: 'pointer'
+            }}
+          >
+            다시 시도
+          </button>
+        </div>
+      </div>
+    )
   }
 
   if (loading || !hourlyData) {
@@ -192,12 +250,14 @@ function TidePage({ location, onLocationChange }) {
   const allTides = []
   if (hourlyData?.highTides) {
     hourlyData.highTides.forEach(tide => {
-      allTides.push({ type: 'high', ...tide })
+      // height가 없으면 기본값 사용
+      allTides.push({ type: 'high', height: tide.height ?? 0, ...tide })
     })
   }
   if (hourlyData?.lowTides) {
     hourlyData.lowTides.forEach(tide => {
-      allTides.push({ type: 'low', ...tide })
+      // height가 없으면 기본값 사용
+      allTides.push({ type: 'low', height: tide.height ?? 0, ...tide })
     })
   }
 
@@ -212,18 +272,66 @@ function TidePage({ location, onLocationChange }) {
   allTides.forEach((tide, idx) => {
     if (idx > 0) {
       const prevTide = allTides[idx - 1]
-      tide.heightChange = tide.height - prevTide.height
+      tide.heightChange = (tide.height ?? 0) - (prevTide.height ?? 0)
     } else {
       tide.heightChange = 0
     }
   })
 
-  // 시간대별 근접 극값 맵 (범위: 1.5시간 전후)
-  const getNearestTide = (hour) => {
-    return allTides.find(t => {
-      const tideHour = parseInt(t.time.split(':')[0])
-      return hour <= tideHour && tideHour < hour + 3
-    })
+  // 현재 시각의 만조/간조 상태 판정
+  const getTideStatus = (hour, currentHeight) => {
+    if (allTides.length === 0) return null
+
+    // prevTide: 현재 시각 이전 또는 같은 시각의 극값
+    // nextTide: 현재 시각 이후의 극값
+    let prevTide = null
+    let nextTide = null
+
+    for (const tide of allTides) {
+      const tideHour = parseInt(tide.time.split(':')[0])
+      const tideMin = parseInt(tide.time.split(':')[1])
+      const tideTotalMin = tideHour * 60 + tideMin
+      const hourTotalMin = hour * 60
+
+      if (tideTotalMin <= hourTotalMin) {
+        prevTide = tide
+      } else if (!nextTide) {
+        nextTide = tide
+      }
+    }
+
+    // 경계 처리
+    if (!nextTide) nextTide = allTides[allTides.length - 1]
+    if (!prevTide) prevTide = allTides[0]
+
+    // 만조/간조 방향에 따른 diff 계산
+    const diff = nextTide.type === 'high'
+      ? currentHeight - (prevTide.height ?? 0)  // 만조 방향: 간조 대비 증가량
+      : (prevTide.height ?? 0) - currentHeight  // 간조 방향: 만조 대비 감소량
+
+    return {
+      phase: nextTide.type === 'high' ? 'high' : 'low',
+      label: nextTide.type === 'high' ? '만조' : '간조',
+      time: nextTide.time,
+      height: nextTide.height ?? 0,
+      diff: Math.abs(diff)
+    }
+  }
+
+  // 시간대별 근접 극값 (범위: 3시간) - displayInterval에 따라 표시 여부만 판정
+  const getNearestTides = (hour, interval) => {
+    const tideStatus = getTideStatus(hour, 0)
+    if (!tideStatus) return null
+
+    const tideHour = parseInt(tideStatus.time.split(':')[0])
+    if (interval === 1) {
+      // 1시간 간격: 정확한 시간만
+      return tideHour === hour ? tideStatus : null
+    } else if (interval === 3) {
+      // 3시간 간격: 근접한 시간 (3시간 범위)
+      return hour <= tideHour && tideHour < hour + 3 ? tideStatus : null
+    }
+    return null
   }
 
   return (
@@ -312,31 +420,84 @@ function TidePage({ location, onLocationChange }) {
         </div>
       </div>
 
-      {/* 날짜 선택 & 탭 네비게이션 */}
+      {/* 날짜 제어 & 탭 네비게이션 통합 */}
       <div className="date-tab-bar">
-        <div className="date-selector">
-          <button
-            disabled={selectedDate.toDateString() === new Date(selectedDate.getTime() - 86400000).toDateString()}
-            onClick={() => setSelectedDate(new Date(selectedDate.getTime() - 86400000))}
-            className="date-nav-btn"
-            title="어제"
-          >
-            ← 어제
-          </button>
-          <button
-            onClick={() => setSelectedDate(new Date())}
-            className={`date-nav-btn ${selectedDate.toDateString() === new Date().toDateString() ? 'active' : ''}`}
-            title="오늘"
-          >
-            오늘
-          </button>
-          <button
-            onClick={() => setSelectedDate(new Date(selectedDate.getTime() + 86400000))}
-            className="date-nav-btn"
-            title="내일"
-          >
-            내일 →
-          </button>
+        <div className="date-control-bar">
+          <div className="quick-date-buttons">
+            <button
+              onClick={() => setSelectedDate(new Date(selectedDate.getTime() - 86400000))}
+              className="quick-date-btn"
+              title="어제"
+            >
+              어제
+            </button>
+            <button
+              onClick={() => setSelectedDate(new Date())}
+              className={`quick-date-btn ${selectedDate.toDateString() === new Date().toDateString() ? 'active' : ''}`}
+              title="오늘"
+            >
+              오늘
+            </button>
+            <button
+              onClick={() => setSelectedDate(new Date(selectedDate.getTime() + 86400000))}
+              className="quick-date-btn"
+              title="내일"
+            >
+              내일
+            </button>
+          </div>
+
+          <div className="nav-icon-buttons">
+            <button
+              onClick={() => setSelectedDate(new Date(selectedDate.getTime() - 86400000))}
+              className="nav-icon-btn"
+              title="이전날짜"
+            >
+              ◀◀
+            </button>
+            <button
+              onClick={() => dateInputRef.current?.click()}
+              className="nav-icon-btn calendar-btn"
+              title="달력 선택"
+            >
+              📅
+            </button>
+            <input
+              ref={dateInputRef}
+              type="date"
+              style={{ display: 'none' }}
+              onChange={(e) => {
+                if (e.target.value) {
+                  setSelectedDate(new Date(e.target.value + 'T00:00:00'))
+                }
+              }}
+              value={selectedDate.toISOString().split('T')[0]}
+            />
+            <button
+              onClick={() => setSelectedDate(new Date(selectedDate.getTime() + 86400000))}
+              className="nav-icon-btn"
+              title="다음날짜"
+            >
+              ▶▶
+            </button>
+          </div>
+
+          <div className="interval-buttons">
+            <button
+              className={`interval-btn ${displayInterval === 1 ? 'active' : ''}`}
+              onClick={() => setDisplayInterval(1)}
+              title="1시간 간격"
+            >
+              1시간
+            </button>
+            <button
+              className={`interval-btn ${displayInterval === 3 ? 'active' : ''}`}
+              onClick={() => setDisplayInterval(3)}
+              title="3시간 간격"
+            >
+              3시간
+            </button>
+          </div>
         </div>
 
         <div className="tab-navigation">
@@ -358,76 +519,81 @@ function TidePage({ location, onLocationChange }) {
       {/* 물때 탭 */}
       {activeTab === 'tide' && (
         <div className="tide-content-wrapper">
-          {/* 1시간 단위 테이블 */}
-          <div className="hourly-table-container">
-            <table className="hourly-table">
-              <thead>
-                <tr>
-                  <th>시간</th>
-                  <th>수위</th>
-                  <th>변화</th>
-                  <th>만/간<br/>대비</th>
-                  <th>조류</th>
-                  <th>바람</th>
-                  <th>날씨</th>
-                  <th>일출/일몰</th>
-                  <th>만조/간조</th>
-                </tr>
-              </thead>
-              <tbody>
-                {hourlyData.hourly && hourlyData.hourly.map((item, idx) => {
-                  const prevHeight = idx > 0 ? hourlyData.hourly[idx - 1].height : item.height
+          {loading && <div className="loading">데이터 로드 중...</div>}
+          {hourlyData && (
+            <div className="hourly-table-container">
+              <table className="hourly-table">
+                <thead>
+                  <tr>
+                    <th>시간</th>
+                    <th>수위(변화)</th>
+                    <th>조류</th>
+                    <th>바람</th>
+                    <th>날씨</th>
+                    <th>일출/일몰</th>
+                    <th>만조/간조</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {hourlyData.hourly && hourlyData.hourly
+                    .filter(item => displayInterval === 1 || item.hour % displayInterval === 0)
+                    .map((item, idx) => {
+                  // 원본 배열에서 이전 시간의 높이 찾기
+                  const prevItem = hourlyData.hourly.find(h => h.hour === item.hour - 1)
+                  const prevHeight = prevItem ? prevItem.height : item.height
                   const change = item.height - prevHeight
-                  const changeIcon = change > 0.01 ? '↑' : change < -0.01 ? '↓' : '→'
+                  const changeSign = change > 0.01 ? '+' : change < -0.01 ? '-' : '±'
+                  const changeClass = change > 0.01 ? 'increase' : change < -0.01 ? 'decrease' : 'flat'
                   const timeStr = String(item.hour).padStart(2, '0') + ':00'
-                  const tideInfo = tideMap[item.hour]
-
-                  // 간조/만조 대비 변화 계산
-                  const lowTide = Math.min(...hourlyData.hourly.map(h => h.height))
-                  const highTide = Math.max(...hourlyData.hourly.map(h => h.height))
-                  const tideRange = highTide - lowTide
-                  const tidePercent = tideRange > 0 ? Math.round(((item.height - lowTide) / tideRange) * 100) : 50
 
                   // 일출/일몰 시간 표시 (문자열로 받음)
                   const sunriseTime = hourlyData.sunrise // "05:35" 형식
                   const sunsetTime = hourlyData.sunset // "19:39" 형식
                   const sunriseHour = parseInt(sunriseTime.split(':')[0])
                   const sunsetHour = parseInt(sunsetTime.split(':')[0])
-                  const isSunriseNear = item.hour <= sunriseHour && sunriseHour < item.hour + 3
-                  const isSunsetNear = item.hour <= sunsetHour && sunsetHour < item.hour + 3
-                  const sunEvent = isSunriseNear ? `🌅 ${sunriseTime}` :
-                                   isSunsetNear ? `🌇 ${sunsetTime}` : '-'
+
+                  // displayInterval에 따라 다른 기준으로 표시
+                  let sunEvent = '-'
+                  if (displayInterval === 1) {
+                    // 1시간 간격: 정확한 시간만 표시
+                    if (item.hour === sunriseHour) {
+                      sunEvent = `🌅 ${sunriseTime}`
+                    } else if (item.hour === sunsetHour) {
+                      sunEvent = `🌇 ${sunsetTime}`
+                    }
+                  } else if (displayInterval === 3) {
+                    // 3시간 간격: 근접한 시간에만 표시 (item.hour 이상 item.hour+3 미만)
+                    if (item.hour <= sunriseHour && sunriseHour < item.hour + 3) {
+                      sunEvent = `🌅 ${sunriseTime}`
+                    } else if (item.hour <= sunsetHour && sunsetHour < item.hour + 3) {
+                      sunEvent = `🌇 ${sunsetTime}`
+                    }
+                  }
 
                   // 시간대별 배경 그래디언션 (야간/주간)
                   const isNight = item.hour < sunriseHour || item.hour >= sunsetHour
                   const bgClass = isNight ? 'night' : 'day'
 
-                  // 근접 극값 찾기
-                  const nearestTide = getNearestTide(item.hour)
+                  // 조류 세기 판정
+                  const currentStrength = item.currentSpeed < 0.15 ? '약' : item.currentSpeed < 0.35 ? '중' : '강'
+
+                  // 근접 극값들 찾기 (displayInterval 고려)
+                  const nearestTides = getNearestTides(item.hour, displayInterval)
 
                   return (
                     <tr key={idx} className={bgClass}>
                       <td className="time-cell">{timeStr}</td>
-                      <td className="height-cell">{item.height.toFixed(2)}m</td>
-                      <td className="change-cell">
-                        <span className={`change-badge ${change > 0 ? 'up' : change < 0 ? 'down' : 'flat'}`}>
-                          {changeIcon}{Math.abs(change).toFixed(2)}
-                        </span>
-                      </td>
-                      <td className="tide-range-cell">
-                        <div className="tide-bar-container">
-                          <div className="tide-bar" style={{ width: `${tidePercent}%` }}></div>
-                          <span className="tide-percent">{tidePercent}%</span>
-                        </div>
+                      <td className={`height-cell height-change ${changeClass}`}>
+                        {item.height.toFixed(2)}m({changeSign}{Math.abs(change).toFixed(2)}m)
                       </td>
                       <td className="current-cell">
                         <div className="current-bar-container">
                           <div className="current-bar" style={{ width: `${(item.currentSpeed / Math.max(...hourlyData.hourly.map(h => h.currentSpeed))) * 100}%` }}></div>
-                          <span className="current-value">{item.currentSpeed.toFixed(2)}</span>
+                          <span className="current-value">{item.currentSpeed.toFixed(2)}m/s({currentStrength})</span>
                         </div>
                       </td>
                       <td className="wind-cell">
-                        <span className="wind-value">{item.windSpeed.toFixed(1)}m/s</span>
+                        {item.windSpeed.toFixed(1)}m/s({item.windDir})
                       </td>
                       <td className="weather-cell">
                         <span className="weather-icon">{getWeatherIcon(item.weather)}</span>
@@ -436,32 +602,25 @@ function TidePage({ location, onLocationChange }) {
                       <td className="sun-cell">
                         {sunEvent}
                       </td>
-                      <td className="tide-cell">
-                        {nearestTide ? (
-                          <div className={`tide-detail tide-${nearestTide.type}`}>
-                            <span className={`tide-label ${nearestTide.type}`}>
-                              {nearestTide.type === 'high' ? '🔺만조' : '🔻간조'}
+                      <td className={`tide-cell tide-${nearestTides ? nearestTides.phase : 'none'}`}>
+                        {nearestTides ? (
+                          <span>
+                            {nearestTides.label} {nearestTides.time} ({nearestTides.height.toFixed(2)}m)
+                            <span className={nearestTides.phase === 'high' ? 'tide-up' : 'tide-down'}>
+                              {nearestTides.phase === 'high' ? '↑' : '↓'}{nearestTides.diff.toFixed(2)}m
                             </span>
-                            <span className="tide-time">{nearestTide.time}</span>
-                            <span className="tide-info">
-                              {nearestTide.height.toFixed(2)}m
-                              {nearestTide.heightChange !== 0 && (
-                                <span className={nearestTide.heightChange > 0 ? 'up' : 'down'}>
-                                  {nearestTide.heightChange > 0 ? '+' : ''}{nearestTide.heightChange.toFixed(2)}m
-                                </span>
-                              )}
-                            </span>
-                          </div>
+                          </span>
                         ) : (
-                          <span>-</span>
+                          '-'
                         )}
                       </td>
                     </tr>
                   )
                 })}
-              </tbody>
-            </table>
-          </div>
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       )}
 
@@ -478,10 +637,13 @@ function TidePage({ location, onLocationChange }) {
                   <th>날씨</th>
                   <th>기온</th>
                   <th>파고</th>
+                  <th>강수확률</th>
                 </tr>
               </thead>
               <tbody>
-                {hourlyData.hourly && hourlyData.hourly.map((item, idx) => {
+                {hourlyData.hourly && hourlyData.hourly
+                  .filter(item => displayInterval === 1 || item.hour % displayInterval === 0)
+                  .map((item, idx) => {
                   const sunriseHour = parseInt(hourlyData.sunrise.split(':')[0])
                   const sunsetHour = parseInt(hourlyData.sunset.split(':')[0])
                   const isNight = item.hour < sunriseHour || item.hour >= sunsetHour
@@ -499,7 +661,7 @@ function TidePage({ location, onLocationChange }) {
                         </div>
                       </td>
                       <td className="wind-speed-cell">
-                        <div className="current">{item.windSpeed.toFixed(1)}m/s</div>
+                        <div className="direction-speed">{item.windDir} {item.windSpeed.toFixed(1)}m/s</div>
                         <div className="max">최대 {(item.windSpeed * 1.6).toFixed(1)}m/s</div>
                       </td>
                       <td className="weather-cell">
@@ -512,6 +674,10 @@ function TidePage({ location, onLocationChange }) {
                         <div className="wave-icon">🌊</div>
                         <div>{item.waveHeight}m</div>
                         <div className="period">{item.wavePeriod}s</div>
+                      </td>
+                      <td className="precipitation-cell">
+                        <div className="precip-value">{item.precipitation || 0}%</div>
+                        <div className="precip-bar" style={{ width: `${item.precipitation || 0}%`, maxWidth: '60px' }}></div>
                       </td>
                     </tr>
                   )

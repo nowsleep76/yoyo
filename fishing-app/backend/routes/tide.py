@@ -1,5 +1,7 @@
 from flask import Blueprint, request, jsonify
 from services.tide_service import get_tide_data, get_tide_calendar, get_tide_hourly
+from datetime import datetime
+from services.tides_korea import get_tide_for_date, LUNAR_CONVERSION_2026
 
 tide_bp = Blueprint('tide', __name__)
 
@@ -18,8 +20,30 @@ def fetch_tide_hourly():
     longitude = request.args.get('lon', type=float, default=126.9780)
     date_str = request.args.get('date', type=str, default=None)
 
-    hourly_data = get_tide_hourly(latitude, longitude, date_str)
+    # 정확한 데이터를 먼저 시도
+    if date_str:
+        target = datetime.strptime(date_str, '%Y-%m-%d')
+        tide_info = get_tide_for_date(target.day)
+        lunar_info = LUNAR_CONVERSION_2026.get((target.month, target.day))
 
+        if tide_info and lunar_info:
+            # 정확한 한국 조석표 데이터 사용
+            hourly_data = get_tide_hourly(latitude, longitude, date_str)
+
+            # get_tide_hourly()에서 이미 highTides/lowTides를 height와 함께 반환하므로
+            # lunar 필드 키를 정규화하여 업데이트
+            hourly_data.update({
+                'lunar': {
+                    'month': lunar_info.get('lunar_month'),
+                    'day': lunar_info.get('lunar_day'),
+                    'age': lunar_info.get('lunar_age')
+                },
+                'tideStrength': tide_info.get('strength', '중')
+            })
+            return jsonify(hourly_data)
+
+    # 일반 계산 방식으로 폴백
+    hourly_data = get_tide_hourly(latitude, longitude, date_str)
     return jsonify(hourly_data)
 
 @tide_bp.route('/api/tide/calendar', methods=['GET'])
