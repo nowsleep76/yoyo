@@ -92,8 +92,9 @@ function RecordsPage({ location, userId }) {
           setFavorites(await favoritesRes.json())
         }
         if (statsRes.ok) {
-          setStats(await statsRes.json())
-          setMyStats(await statsRes.json())
+          const statsData = await statsRes.json()
+          setStats(statsData)
+          setMyStats(statsData)
         }
 
         // 랭킹 데이터 로드

@@ -13,23 +13,23 @@ class KmaWeatherService:
     CACHE = {}  # {(nx, ny, base_date, base_time): data, 'timestamp': datetime}
     CACHE_TTL = 1800  # 30분
 
-    # 기상청 격자 변환 상수
+    # 기상청 격자 변환 상수 (기상청 공식 변환식 기준)
     RE = 6371.00877  # 지구 반지름(km)
     GRID = 5.0  # 격자 간격(km)
     SLAT1 = 30.0  # 표준 위도 1
     SLAT2 = 60.0  # 표준 위도 2
     OLON = 126.0  # 기준점 경도
-    OLAT = 37.0  # 기준점 위도
-    XO = 43.0  # 기준점 격자 X
-    YO = 136.0  # 기준점 격자 Y
+    OLAT = 38.0  # 기준점 위도
+    XO = 43  # 기준점 격자 X
+    YO = 136  # 기준점 격자 Y
 
     @staticmethod
     def _latlon_to_grid(lat: float, lon: float) -> tuple:
         """위경도를 기상청 격자 좌표(nx, ny)로 변환"""
         try:
             DEGRAD = math.pi / 180.0
-            RADDEG = 180.0 / math.pi
 
+            re = KmaWeatherService.RE / KmaWeatherService.GRID
             slat1 = KmaWeatherService.SLAT1 * DEGRAD
             slat2 = KmaWeatherService.SLAT2 * DEGRAD
             olon = KmaWeatherService.OLON * DEGRAD
@@ -42,10 +42,10 @@ class KmaWeatherService:
             sf = (math.pow(sf, sn) * math.cos(slat1)) / sn
 
             ro = math.tan(math.pi / 4.0 + olat / 2.0)
-            ro = (KmaWeatherService.RE * sf / math.pow(ro, sn)) * KmaWeatherService.GRID
+            ro = re * sf / math.pow(ro, sn)
 
             ra = math.tan(math.pi / 4.0 + (lat * DEGRAD) / 2.0)
-            ra = (KmaWeatherService.RE * sf / math.pow(ra, sn)) * KmaWeatherService.GRID
+            ra = re * sf / math.pow(ra, sn)
 
             theta = lon * DEGRAD - olon
             if theta > math.pi:
@@ -55,7 +55,7 @@ class KmaWeatherService:
 
             theta *= sn
 
-            nx = math.floor(ro * math.sin(theta) + KmaWeatherService.XO + 0.5)
+            nx = math.floor(ra * math.sin(theta) + KmaWeatherService.XO + 0.5)
             ny = math.floor(ro - ra * math.cos(theta) + KmaWeatherService.YO + 0.5)
 
             return (int(nx), int(ny))
@@ -138,9 +138,9 @@ class KmaWeatherService:
 
         nx, ny = grid
 
-        # 캐시 확인
+        # 캐시 확인 (대상 날짜별로 별도 캐시해야 날짜 변경 시 데이터가 갱신됨)
         base_date, base_time = KmaWeatherService._get_base_datetime()
-        cache_key = (nx, ny, base_date, base_time)
+        cache_key = (nx, ny, base_date, base_time, target_date)
 
         if cache_key in KmaWeatherService.CACHE:
             cached_data, timestamp = KmaWeatherService.CACHE[cache_key]
