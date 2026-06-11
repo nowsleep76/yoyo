@@ -2,6 +2,7 @@ from flask import Flask
 from flask_cors import CORS
 from models.database import init_db
 from dotenv import load_dotenv
+from config import config
 from routes.weather import weather_bp
 from routes.tide import tide_bp
 from routes.points import points_bp

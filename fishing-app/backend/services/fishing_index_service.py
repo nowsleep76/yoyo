@@ -1,7 +1,7 @@
 import requests
-import os
 from datetime import datetime, timedelta
 from typing import Optional, Dict
+from config import config
 
 # 해양수산부 국립해양조사원 바다낚시지수 조회 API
 
@@ -39,7 +39,7 @@ class FishingIndexService:
                 return cached_data
 
         # API 호출 시도
-        api_key = os.getenv('FISHING_INDEX_API_KEY')
+        api_key = config.get_api_key('fishing_index_api_key')
         if api_key:
             try:
                 # 최근접 지역 찾기

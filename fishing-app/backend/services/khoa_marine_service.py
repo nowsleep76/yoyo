@@ -1,7 +1,7 @@
 import requests
-import os
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Tuple
+from config import config
 
 # 국립해양조사원(KHOA) 실시간 해양관측 API 서비스
 # 각 해역의 대표 관측소 위경도 정보로 최근접 관측소 매핑
@@ -54,7 +54,7 @@ class KhoaMarineService:
         Returns:
             {waveHeight, waterTemp} 또는 None
         """
-        api_key = os.getenv('KHOA_SERVICE_KEY')
+        api_key = config.get_api_key('khoa_service_key')
         if not api_key:
             return None
 
@@ -124,7 +124,7 @@ class KhoaMarineService:
         Returns:
             {waveHeight, waterTemp} 또는 None
         """
-        api_key = os.getenv('KHOA_SERVICE_KEY')
+        api_key = config.get_api_key('khoa_service_key')
         if not api_key:
             return None
 

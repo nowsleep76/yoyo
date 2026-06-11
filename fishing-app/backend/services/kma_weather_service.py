@@ -1,8 +1,8 @@
 import requests
-import os
 from datetime import datetime, timedelta
 import math
 from typing import Optional, Dict
+from config import config
 
 # 기상청 단기예보 API 서비스
 # 위경도 → 기상청 격자 좌표(nx, ny) 변환 (Lambert Conformal Conic)
@@ -119,7 +119,7 @@ class KmaWeatherService:
         Returns:
             {hour: {temp, weather, precipitation, windSpeed, windDir}} 또는 None
         """
-        api_key = os.getenv('KMA_SERVICE_KEY')
+        api_key = config.get_api_key('kma_service_key')
         if not api_key:
             return None
 
