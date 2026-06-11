@@ -9,7 +9,7 @@ from config import config
 # 출처: 기상청 공식 변환식
 
 class KmaWeatherService:
-    BASE_URL = "http://apis.data.go.kr/1360000/VilageFcstInfoService/getVilageFcst"
+    BASE_URL = "https://apis.data.go.kr/1360000/VilageFcstInfoService_2.0/getVilageFcst"
     CACHE = {}  # {(nx, ny, base_date, base_time): data, 'timestamp': datetime}
     CACHE_TTL = 1800  # 30분
 
@@ -202,6 +202,13 @@ class KmaWeatherService:
             # 시간별 데이터 조립
             for hour in sorted(category_data.keys()):
                 hour_data = category_data[hour]
+
+                # 결측값(-999, -998 등 sentinel) 시간대는 건너뛰고 시뮬레이션 값 유지
+                try:
+                    if float(hour_data.get('TMP', 0)) <= -900 or float(hour_data.get('WSD', 0)) <= -900:
+                        continue
+                except (TypeError, ValueError):
+                    continue
 
                 temp = float(hour_data.get('TMP', 15.0))
                 pty = int(hour_data.get('PTY', 0))

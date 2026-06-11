@@ -417,8 +417,13 @@ function TidePage({ location, onLocationChange }) {
           <span className="tide-info">{hourlyData.tideNumber}물</span>
           <span className="separator">/</span>
           <span className="current-info">조류 {hourlyData.volume?.label || '중간'}</span>
+          {hourlyData.tideSource === 'official' ? (
+            <span className="data-source-badge official">공식 조석표</span>
+          ) : (
+            <span className="data-source-badge simulated">조석 예측치</span>
+          )}
           {hourlyData.weatherSource === 'simulated' && (
-            <span className="data-source-badge simulated">예측 데이터</span>
+            <span className="data-source-badge simulated">기상 예측치</span>
           )}
         </div>
       </div>

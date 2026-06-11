@@ -2,6 +2,7 @@ from datetime import datetime, timedelta
 import math
 from services.kma_weather_service import KmaWeatherService
 from services.khoa_marine_service import KhoaMarineService
+from services.tides_korea import get_tide_table, get_lunar_conversion
 
 # 한국 조석표 데이터 (위도, 경도, 기준항의 간조/만조 시간 기준)
 KOREA_TIDE_REFS = {
@@ -24,6 +25,17 @@ def get_tide_volume(tide_number):
         if lo <= tide_number <= hi:
             return info
     return {'label': '중간', 'level': 2, 'desc': '', 'strength': '중'}
+
+def find_nearest_region(latitude, longitude):
+    """위경도에서 가장 가까운 기준 해역 코드(KOREA_TIDE_REFS 키) 반환"""
+    nearest_key = None
+    min_distance = float('inf')
+    for key, ref in KOREA_TIDE_REFS.items():
+        distance = (latitude - ref['lat']) ** 2 + (longitude - ref['lon']) ** 2
+        if distance < min_distance:
+            min_distance = distance
+            nearest_key = key
+    return nearest_key
 
 # 정확한 음력 변환 (한국 음력 기준)
 def get_lunar_date_accurate(solar_date):
@@ -179,6 +191,20 @@ def get_tide_hourly(latitude, longitude, date_str=None):
 
     # 음력 날짜 계산
     lunar_info = get_lunar_date(target)
+
+    # 위치에 해당하는 해역의 공식 조석표 데이터 조회 (있으면 시뮬레이션 값을 대체)
+    region = find_nearest_region(latitude, longitude)
+    official_tide = get_tide_table(region, target.month, target.day)
+    if official_tide:
+        tide_num = official_tide['tide_num']
+
+    official_lunar = get_lunar_conversion(target.month, target.day)
+    if official_lunar:
+        lunar_info = {
+            'month': official_lunar['lunar_month'],
+            'day': official_lunar['lunar_day'],
+            'age': official_lunar['lunar_age']
+        }
 
     # 실시간 API 데이터 조회
     kma_weather = KmaWeatherService.get_hourly_weather(latitude, longitude, target.strftime('%Y-%m-%d'))
@@ -338,6 +364,19 @@ def get_tide_hourly(latitude, longitude, date_str=None):
     high_tides_camel = [{'time': t['time'], 'height': t['height']} for t in high_tides]
     low_tides_camel = [{'time': t['time'], 'height': t['height']} for t in low_tides]
 
+    # 공식 조석표가 있으면 만조/간조 시각을 실제 값으로 대체 (높이는 시뮬레이션 곡선에서 보간)
+    if official_tide:
+        def interpolate_height(time_str):
+            h, m = map(int, time_str.split(':'))
+            h0 = hourly[h % 24]['height']
+            h1 = hourly[(h + 1) % 24]['height']
+            return round(h0 + (h1 - h0) * (m / 60), 2)
+
+        high_tides_camel = [{'time': t, 'height': interpolate_height(t)} for t in official_tide['high']]
+        low_tides_camel = [{'time': t, 'height': interpolate_height(t)} for t in official_tide['low']]
+
+    tide_source = 'official' if official_tide else 'simulated'
+
     # 천체 데이터
     celestial_events = [
         {'type': 'sunrise', 'hour': celestial['sunrise'], 'label': '일출'},
@@ -365,7 +404,9 @@ def get_tide_hourly(latitude, longitude, date_str=None):
             'latitude': latitude,
             'longitude': longitude
         },
-        'weatherSource': weather_source
+        'weatherSource': weather_source,
+        'tideSource': tide_source,
+        'tideStrength': official_tide.get('strength', volume['strength']) if official_tide else volume['strength']
     }
 
 def get_tide_calendar(latitude, longitude, days=7):
