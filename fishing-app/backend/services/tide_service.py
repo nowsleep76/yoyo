@@ -3,6 +3,7 @@ import math
 from services.kma_weather_service import KmaWeatherService
 from services.khoa_marine_service import KhoaMarineService
 from services.tides_korea import get_tide_table, get_lunar_conversion
+from lunarcalendar import Converter, Solar
 
 # 한국 조석표 데이터 (위도, 경도, 기준항의 간조/만조 시간 기준)
 KOREA_TIDE_REFS = {
@@ -184,32 +185,62 @@ def get_tide_hourly(latitude, longitude, date_str=None):
     else:
         target = datetime.now()
 
-    days_since = (target - reference_new_moon).days
-    lunar_age = (days_since % 29.5306) + 1  # 더 정확한 음력 주기 사용
-    tide_num = int((lunar_age / 29.5306) * 15) + 1
-    tide_num = min(15, max(1, tide_num))
+    # 음력 날짜 계산 (lunarcalendar 라이브러리 사용 - 가장 정확함)
+    try:
+        solar = Solar(target.year, target.month, target.day)
+        lunar = Converter.Solar2Lunar(solar)
+        lunar_info = {
+            'month': lunar.month,
+            'day': lunar.day,
+            'age': lunar.day  # 음력 나이 = 음력 일수
+        }
 
-    # 음력 날짜 계산
-    lunar_info = get_lunar_date(target)
+        # 물때 계산: 음력 일수 기반 (1~15물 반복)
+        lunar_day = lunar.day
+        tide_num = (lunar_day % 15) if (lunar_day % 15) != 0 else 15
+        print(f"[DEBUG] Lunar: {lunar.month}/{lunar_day}, Calculated Tide: {tide_num}")
 
-    # 위치에 해당하는 해역의 공식 조석표 데이터 조회 (있으면 시뮬레이션 값을 대체)
+    except Exception as e:
+        import sys
+        print(f"[ERROR] 음력 계산 오류: {type(e).__name__}: {e}", file=sys.stderr, flush=True)
+        import traceback
+        traceback.print_exc(file=sys.stderr)
+
+        # Fallback: 공식 테이블 또는 추정
+        official_lunar = get_lunar_conversion(target.month, target.day)
+        if official_lunar:
+            lunar_info = {
+                'month': official_lunar['lunar_month'],
+                'day': official_lunar['lunar_day'],
+                'age': official_lunar['lunar_age']
+            }
+            # Fallback 물때 계산
+            lunar_day = official_lunar['lunar_day']
+            tide_num = (lunar_day % 15) if (lunar_day % 15) != 0 else 15
+            print(f"[FALLBACK] Using table: Lunar {lunar_day}, Tide {tide_num}", file=sys.stderr, flush=True)
+        else:
+            lunar_info = get_lunar_date(target)
+            # Fallback 물때 계산
+            lunar_day = lunar_info['day']
+            tide_num = (lunar_day % 15) if (lunar_day % 15) != 0 else 15
+            print(f"[FALLBACK] Using get_lunar_date: Lunar {lunar_day}, Tide {tide_num}", file=sys.stderr, flush=True)
+
+    # 위치에 해당하는 해역의 공식 조석표 데이터 조회 (만조/간조 시각만 사용)
     region = find_nearest_region(latitude, longitude)
     official_tide = get_tide_table(region, target.month, target.day)
-    if official_tide:
-        tide_num = official_tide['tide_num']
 
-    official_lunar = get_lunar_conversion(target.month, target.day)
-    if official_lunar:
-        lunar_info = {
-            'month': official_lunar['lunar_month'],
-            'day': official_lunar['lunar_day'],
-            'age': official_lunar['lunar_age']
-        }
+    # DEBUG: 현재 tide_num 값 확인
+    import sys
+    print(f"[DEBUG] Date: {target.strftime('%Y-%m-%d')}, Lunar: {lunar_info['month']}/{lunar_info['day']}, Final tide_num: {tide_num}", file=sys.stderr, flush=True)
+
+    # 주의: 공식 조석표의 tide_num은 lunarcalendar 기반으로 이미 계산됨
+    # 대신 lunarcalendar 기반 계산된 tide_num을 사용함
 
     # 실시간 API 데이터 조회
     kma_weather = KmaWeatherService.get_hourly_weather(latitude, longitude, target.strftime('%Y-%m-%d'))
     khoa_marine = KhoaMarineService.get_hourly_marine(latitude, longitude, target.strftime('%Y-%m-%d'))
-    weather_source = 'api' if kma_weather or khoa_marine else 'simulated'
+    weather_source = 'api' if kma_weather else 'simulated'
+    marine_source = 'api' if khoa_marine else 'simulated'
 
     # 천체 데이터 계산
     celestial = get_celestial_times(target, latitude)
@@ -221,6 +252,10 @@ def get_tide_hourly(latitude, longitude, date_str=None):
 
     month = target.month
     base_water_temp = 8 + (month - 1) * 1.3
+
+    # 현재 시간을 기반으로 약간의 변동성 추가 (매 시간 데이터가 약간 다르도록)
+    now = datetime.now()
+    time_seed = now.hour * 100 + now.minute  # 시간 기반 seed
 
     hourly = []
     for i in range(24):
@@ -240,9 +275,14 @@ def get_tide_hourly(latitude, longitude, date_str=None):
         current_speed = round(0.5 * abs(math.cos(current_phase)), 2)
 
         # 시간별 날씨 데이터 생성 (기본값은 시뮬레이션)
-        temp = round(12 + 8 * math.sin((i - 6) * math.pi / 12), 1)
-        wind_speed = round(2.5 + 3.5 * abs(math.sin((i - 3) * math.pi / 12)), 1)
-        wind_degree = (i * 15) % 360
+        # 시간과 현재 시간을 기반으로 약간의 변동 추가
+        temp_variation = math.sin((i - 6 + time_seed * 0.01) * math.pi / 12) * 0.5
+        temp = round(12 + 8 * math.sin((i - 6) * math.pi / 12) + temp_variation, 1)
+
+        wind_variation = math.cos((i - 3 + time_seed * 0.02) * math.pi / 12) * 0.3
+        wind_speed = round(max(0.5, 2.5 + 3.5 * abs(math.sin((i - 3) * math.pi / 12)) + wind_variation), 1)
+
+        wind_degree = (i * 15 + time_seed) % 360
         wave_height = round(0.3 + 0.6 * abs(math.sin((i - 6) * math.pi / 12)), 1)
 
         # 날씨 결정 (시간대별)
@@ -269,7 +309,7 @@ def get_tide_hourly(latitude, longitude, date_str=None):
 
         precipitation = min(100, max(0, int(precipitation)))
 
-        # API 데이터가 있으면 기본값 대체
+        # KMA 기상청 API 데이터 통합 (바람, 날씨, 강수)
         if kma_weather and i in kma_weather:
             kma_data = kma_weather[i]
             temp = kma_data.get('temp', temp)
@@ -278,9 +318,27 @@ def get_tide_hourly(latitude, longitude, date_str=None):
             wind_speed = kma_data.get('windSpeed', wind_speed)
             wind_dir = kma_data.get('windDir', wind_dir)
 
-        if khoa_marine:
-            wave_height = khoa_marine.get('waveHeight', wave_height)
-            water_temp = khoa_marine.get('waterTemp', water_temp)
+        # KHOA 해양 시계열 데이터 통합 (수위, 수온, 조류)
+        if khoa_marine and 'hourly' in khoa_marine and i in khoa_marine['hourly']:
+            khoa_hourly = khoa_marine['hourly'][i]
+
+            # 수위 (높이) - KHOA 실측값으로 완전 대체
+            if khoa_hourly.get('height') is not None:
+                height = round(khoa_hourly['height'], 2)
+
+            # 수온 - KHOA 실측값 사용
+            if khoa_hourly.get('waterTemp') is not None:
+                water_temp = round(khoa_hourly['waterTemp'], 1)
+
+            # 조류 속도 - KHOA 실측값 사용
+            if khoa_hourly.get('currentSpeed') is not None:
+                current_speed = round(khoa_hourly['currentSpeed'], 2)
+
+        # KHOA 최신 데이터 (실시간)도 수온/파고에 추가 적용
+        if khoa_marine and 'latestData' in khoa_marine:
+            latest = khoa_marine['latestData']
+            if latest.get('waveHeight') is not None:
+                wave_height = round(latest['waveHeight'], 1)
 
         hourly.append({
             'hour': i,
@@ -308,7 +366,7 @@ def get_tide_hourly(latitude, longitude, date_str=None):
     next_height = 2.0 + amplitude * math.sin(next_phase1) + (amplitude * 0.2) * math.sin(next_phase2)
 
     # 극값(만조/간조) 찾기 - 2차 미분으로 극값 감지
-    high_tides, low_tides = [], []
+    all_extrema = []  # 모든 극값을 시간 순서대로 저장
 
     # 부드러운 극값 감지를 위해 2시간 윈도우 사용
     for i in range(1, 23):
@@ -331,49 +389,96 @@ def get_tide_hourly(latitude, longitude, date_str=None):
         else:
             minute = 0
 
-        # 만조: 2차 미분 < 0 (아래로 볼록)
-        if second_deriv < -0.05:
-            # 6시간 이상 떨어져 있으면 추가
-            if not any(abs(t['hour'] - i) < 6 for t in high_tides):
-                time_str = f'{i:02d}:{minute:02d}'
-                high_tides.append({'hour': i, 'minute': minute, 'time': time_str, 'height': round(curr_h, 2)})
+        # 만조: 2차 미분 < -0.07 (아래로 볼록, 극대값)
+        if second_deriv < -0.07:
+            time_str = f'{i:02d}:{minute:02d}'
+            all_extrema.append({
+                'type': 'high',
+                'hour': i,
+                'minute': minute,
+                'time': time_str,
+                'height': round(curr_h, 2),
+                'deriv': second_deriv
+            })
 
-        # 간조: 2차 미분 > 0 (위로 볼록)
-        elif second_deriv > 0.05:
-            # 6시간 이상 떨어져 있으면 추가
-            if not any(abs(t['hour'] - i) < 6 for t in low_tides):
-                time_str = f'{i:02d}:{minute:02d}'
-                low_tides.append({'hour': i, 'minute': minute, 'time': time_str, 'height': round(curr_h, 2)})
+        # 간조: 2차 미분 > 0.07 (위로 볼록, 극소값)
+        elif second_deriv > 0.07:
+            time_str = f'{i:02d}:{minute:02d}'
+            all_extrema.append({
+                'type': 'low',
+                'hour': i,
+                'minute': minute,
+                'time': time_str,
+                'height': round(curr_h, 2),
+                'deriv': second_deriv
+            })
 
-    # 간조가 없으면 최소값을 간조로 추가
-    if not low_tides and len(hourly) > 0:
-        min_hour = hourly.index(min(hourly, key=lambda x: x['height']))
-        min_height = hourly[min_hour]['height']
-        low_tides.append({'hour': min_hour, 'minute': 0, 'time': f'{min_hour:02d}:00', 'height': round(min_height, 2)})
+    # 극값들을 시간 순서대로 정렬
+    all_extrema.sort(key=lambda x: x['hour'] * 60 + x['minute'])
 
-    # 만조가 없으면 최대값을 만조로 추가
-    if not high_tides and len(hourly) > 0:
+
+
+    # 만조/간조가 교대로 나오도록 필터링 (두 극값의 타입이 다르면 모두 유지)
+    # 극값들을 시간순으로 처리하면서 교대 패턴 유지
+    filtered_extrema = []
+    last_type = None
+
+    for extremum in all_extrema:
+        # 마지막 극값과 다른 타입이면 추가 (교대 패턴 유지)
+        if last_type is None or extremum['type'] != last_type:
+            filtered_extrema.append(extremum)
+            last_type = extremum['type']
+
+    # high/low 분류
+    high_tides = [e for e in filtered_extrema if e['type'] == 'high']
+    low_tides = [e for e in filtered_extrema if e['type'] == 'low']
+
+    # 정렬 및 최종 포맷 (time 필드만 유지)
+    high_tides.sort(key=lambda x: x['hour'])
+    low_tides.sort(key=lambda x: x['hour'])
+
+    # 극값이 너무 적으면 최대/최소값 기반 추가 (긴급 대체)
+    if len(high_tides) == 0 and len(hourly) > 0:
         max_hour = hourly.index(max(hourly, key=lambda x: x['height']))
         max_height = hourly[max_hour]['height']
-        high_tides.append({'hour': max_hour, 'minute': 0, 'time': f'{max_hour:02d}:00', 'height': round(max_height, 2)})
+        high_tides.append({
+            'hour': max_hour,
+            'minute': 0,
+            'time': f'{max_hour:02d}:00',
+            'height': round(max_height, 2)
+        })
+
+    if len(low_tides) == 0 and len(hourly) > 0:
+        min_hour = hourly.index(min(hourly, key=lambda x: x['height']))
+        min_height = hourly[min_hour]['height']
+        low_tides.append({
+            'hour': min_hour,
+            'minute': 0,
+            'time': f'{min_hour:02d}:00',
+            'height': round(min_height, 2)
+        })
 
     # 1시간 단위 데이터 사용 (3시간 필터링 제거)
     volume = get_tide_volume(tide_num)
 
-    # highTides, lowTides 형식 변환 (camelCase, time 필드 추가)
-    high_tides_camel = [{'time': t['time'], 'height': t['height']} for t in high_tides]
-    low_tides_camel = [{'time': t['time'], 'height': t['height']} for t in low_tides]
-
-    # 공식 조석표가 있으면 만조/간조 시각을 실제 값으로 대체 (높이는 시뮬레이션 곡선에서 보간)
+    # 공식 조석표가 있으면 만조/간조 시각을 실제 값으로 대체
+    # 높이는 극값 타입에 따른 표준값 사용 (진폭 기반)
     if official_tide:
-        def interpolate_height(time_str):
-            h, m = map(int, time_str.split(':'))
-            h0 = hourly[h % 24]['height']
-            h1 = hourly[(h + 1) % 24]['height']
-            return round(h0 + (h1 - h0) * (m / 60), 2)
+        # 극값 타입별 높이: 평균 수위 ± 진폭
+        high_height = round(2.0 + amplitude, 2)
+        low_height = round(2.0 - amplitude, 2)
 
-        high_tides_camel = [{'time': t, 'height': interpolate_height(t)} for t in official_tide['high']]
-        low_tides_camel = [{'time': t, 'height': interpolate_height(t)} for t in official_tide['low']]
+        high_tides_camel = []
+        for time_str in official_tide['high']:
+            high_tides_camel.append({'time': time_str, 'height': high_height})
+
+        low_tides_camel = []
+        for time_str in official_tide['low']:
+            low_tides_camel.append({'time': time_str, 'height': low_height})
+    else:
+        # 시뮬레이션 데이터: 극값 감지된 값 사용
+        high_tides_camel = [{'time': t['time'], 'height': t['height']} for t in high_tides]
+        low_tides_camel = [{'time': t['time'], 'height': t['height']} for t in low_tides]
 
     tide_source = 'official' if official_tide else 'simulated'
 
@@ -405,6 +510,7 @@ def get_tide_hourly(latitude, longitude, date_str=None):
             'longitude': longitude
         },
         'weatherSource': weather_source,
+        'marineSource': marine_source,
         'tideSource': tide_source,
         'tideStrength': official_tide.get('strength', volume['strength']) if official_tide else volume['strength']
     }

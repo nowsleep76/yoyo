@@ -3,6 +3,12 @@ from flask_cors import CORS
 from models.database import init_db
 from dotenv import load_dotenv
 from config import config
+import os
+import sys
+
+# 기존 bytecode 캐시 제거
+sys.dont_write_bytecode = True
+
 from routes.weather import weather_bp
 from routes.tide import tide_bp
 from routes.points import points_bp
@@ -11,7 +17,6 @@ from routes.feeding import feeding_bp
 from routes.catches import catches_bp
 from routes.user import user_bp
 from routes.fishing_index import fishing_index_bp
-import os
 
 load_dotenv()
 
@@ -31,6 +36,15 @@ app.register_blueprint(feeding_bp)
 app.register_blueprint(catches_bp)
 app.register_blueprint(user_bp)
 app.register_blueprint(fishing_index_bp)
+
+# 캐싱 무효화: 모든 API 응답에 no-cache 헤더 추가
+@app.after_request
+def add_no_cache_headers(response):
+    """모든 API 응답에 캐시 무효화 헤더 추가"""
+    response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '0'
+    return response
 
 @app.route('/api/health', methods=['GET'])
 def health():

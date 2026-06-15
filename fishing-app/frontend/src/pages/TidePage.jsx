@@ -85,58 +85,72 @@ function TidePage({ location, onLocationChange }) {
   }, [])
 
   // 조위 데이터 페칭
-  useEffect(() => {
+  const fetchHourlyData = async (showLoading = true) => {
     if (!selectedDate || !displayLocation || !displayLocation.latitude) {
       return
     }
 
-    const fetchHourlyData = async () => {
-      try {
-        setLoading(true)
-        setError(null)
-        const dateStr = selectedDate.toISOString().split('T')[0]
+    try {
+      if (showLoading) setLoading(true)
+      setError(null)
+      const dateStr = selectedDate.toISOString().split('T')[0]
 
-        const response = await fetch(
-          `/api/tide/hourly?lat=${displayLocation.latitude}&lon=${displayLocation.longitude}&date=${dateStr}`
-        )
+      console.log(`[TidePage] Fetching data for: ${dateStr}, Location: (${displayLocation.latitude}, ${displayLocation.longitude})`)
 
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}: 데이터 로드 실패`)
-        }
+      const response = await fetch(
+        `/api/tide/hourly?lat=${displayLocation.latitude}&lon=${displayLocation.longitude}&date=${dateStr}`
+      )
 
-        const data = await response.json()
-        if (data && data.hourly) {
-          setHourlyData(data)
-          setError(null)
-        } else {
-          throw new Error('응답 데이터 형식이 올바르지 않습니다')
-        }
-      } catch (err) {
-        console.error('조위 데이터 로드 실패:', err)
-        setError(`데이터를 불러올 수 없습니다: ${err.message}`)
-        setHourlyData(null)
-      } finally {
-        setLoading(false)
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: 데이터 로드 실패`)
       }
-    }
 
-    fetchHourlyData()
+      const data = await response.json()
 
-    // 데이터 검증 로깅
-    if (hourlyData) {
-      console.log('📊 [실시간 데이터 검증]')
-      console.log('  날짜:', hourlyData.date)
-      console.log('  위치:', { lat: hourlyData.location.latitude, lon: hourlyData.location.longitude })
-      console.log('  물때:', hourlyData.tideNumber)
-      console.log('  일출:', hourlyData.sunrise, '일몰:', hourlyData.sunset)
-      console.log('  만조:', hourlyData.highTides?.map(t => t.time))
-      console.log('  간조:', hourlyData.lowTides?.map(t => t.time))
-      console.log('  시간 데이터 샘플 (0시, 12시):', [
-        hourlyData.hourly?.[0],
-        hourlyData.hourly?.[12]
-      ])
+      // 데이터 검증 로깅 (받은 직후)
+      console.log('[TidePage] API Response Data:')
+      console.log('  Date:', data.date)
+      console.log('  Lunar:', `${data.lunar?.month}/${data.lunar?.day}`)
+      console.log('  Tide Number:', data.tideNumber)
+      console.log('  Tide Source:', data.tideSource)
+      console.log('  Marine Source:', data.marineSource)
+      console.log('  Weather Source:', data.weatherSource)
+
+      if (data && data.hourly) {
+        setHourlyData(data)
+        setError(null)
+      } else {
+        throw new Error('응답 데이터 형식이 올바르지 않습니다')
+      }
+    } catch (err) {
+      console.error('[TidePage] 조위 데이터 로드 실패:', err)
+      setError(`데이터를 불러올 수 없습니다: ${err.message}`)
+      setHourlyData(null)
+    } finally {
+      if (showLoading) setLoading(false)
     }
+  }
+
+  // 날짜 또는 위치 변경 시 데이터 페칭
+  useEffect(() => {
+    fetchHourlyData(true)
   }, [selectedDate, displayLocation?.latitude, displayLocation?.longitude])
+
+  // 매분 자동 새로고침 (실시간 데이터 업데이트)
+  useEffect(() => {
+    const refreshInterval = setInterval(() => {
+      // 오늘 날짜인 경우에만 자동 새로고침
+      const today = new Date().toISOString().split('T')[0]
+      const selectedDateStr = selectedDate.toISOString().split('T')[0]
+
+      if (today === selectedDateStr && !loading) {
+        console.log('[TidePage] Auto-refresh (realtime update)...')
+        fetchHourlyData(false) // 로딩 표시 없이 백그라운드에서 업데이트
+      }
+    }, 60000) // 60초마다
+
+    return () => clearInterval(refreshInterval)
+  }, [selectedDate, loading])
 
   // 위치 변경 처리 (StorageUtils 사용)
   const handleLocationChange = (newLocation) => {
@@ -268,6 +282,9 @@ function TidePage({ location, onLocationChange }) {
     return aTime - bTime
   })
 
+  // DEBUG: allTides 순서 확인
+  console.log('[TidePage] allTides 순서:', allTides.map(t => `${t.time} ${t.type === 'high' ? '만조' : '간조'}`).join(' → '))
+
   // 각 극값에 대해 직전 극값과의 수위 변화 계산
   allTides.forEach((tide, idx) => {
     if (idx > 0) {
@@ -278,60 +295,51 @@ function TidePage({ location, onLocationChange }) {
     }
   })
 
-  // 현재 시각의 만조/간조 상태 판정
-  const getTideStatus = (hour, currentHeight) => {
+  // 현재 시간대의 극값 정보만 반환 (간조 또는 만조 중 하나)
+  const getTideSingleInfo = (hour, interval) => {
     if (allTides.length === 0) return null
 
-    // prevTide: 현재 시각 이전 또는 같은 시각의 극값
-    // nextTide: 현재 시각 이후의 극값
-    let prevTide = null
-    let nextTide = null
-
-    for (const tide of allTides) {
+    // 이 시간대에 속하는 극값 찾기
+    const tideInHour = allTides.find(tide => {
       const tideHour = parseInt(tide.time.split(':')[0])
-      const tideMin = parseInt(tide.time.split(':')[1])
-      const tideTotalMin = tideHour * 60 + tideMin
-      const hourTotalMin = hour * 60
-
-      if (tideTotalMin <= hourTotalMin) {
-        prevTide = tide
-      } else if (!nextTide) {
-        nextTide = tide
+      if (interval === 1) {
+        return tideHour === hour
+      } else if (interval === 3) {
+        return hour <= tideHour && tideHour < hour + 3
       }
+      return false
+    })
+
+    if (!tideInHour) return null
+
+    // 현재 극값의 인덱스 찾기
+    const currentIdx = allTides.indexOf(tideInHour)
+
+    // 직전 극값 찾기 (다른 타입)
+    let prevTide = null
+    if (currentIdx > 0) {
+      prevTide = allTides[currentIdx - 1]
+    } else {
+      prevTide = allTides[allTides.length - 1]
     }
 
-    // 경계 처리
-    if (!nextTide) nextTide = allTides[allTides.length - 1]
-    if (!prevTide) prevTide = allTides[0]
-
-    // 만조/간조 방향에 따른 diff 계산
-    const diff = nextTide.type === 'high'
-      ? currentHeight - (prevTide.height ?? 0)  // 만조 방향: 간조 대비 증가량
-      : (prevTide.height ?? 0) - currentHeight  // 간조 방향: 만조 대비 감소량
+    // 수위 변화값 계산
+    let diff = 0
+    if (tideInHour.type === 'high') {
+      // 만조: 직전 간조 대비 상승값
+      diff = tideInHour.height - prevTide.height
+    } else {
+      // 간조: 직전 만조 대비 하락값
+      diff = prevTide.height - tideInHour.height
+    }
 
     return {
-      phase: nextTide.type === 'high' ? 'high' : 'low',
-      label: nextTide.type === 'high' ? '만조' : '간조',
-      time: nextTide.time,
-      height: nextTide.height ?? 0,
+      type: tideInHour.type === 'high' ? 'high' : 'low',
+      label: tideInHour.type === 'high' ? '만조' : '간조',
+      time: tideInHour.time,
+      height: tideInHour.height,
       diff: Math.abs(diff)
     }
-  }
-
-  // 시간대별 근접 극값 (범위: 3시간) - displayInterval에 따라 표시 여부만 판정
-  const getNearestTides = (hour, interval) => {
-    const tideStatus = getTideStatus(hour, 0)
-    if (!tideStatus) return null
-
-    const tideHour = parseInt(tideStatus.time.split(':')[0])
-    if (interval === 1) {
-      // 1시간 간격: 정확한 시간만
-      return tideHour === hour ? tideStatus : null
-    } else if (interval === 3) {
-      // 3시간 간격: 근접한 시간 (3시간 범위)
-      return hour <= tideHour && tideHour < hour + 3 ? tideStatus : null
-    }
-    return null
   }
 
   return (
@@ -417,13 +425,28 @@ function TidePage({ location, onLocationChange }) {
           <span className="tide-info">{hourlyData.tideNumber}물</span>
           <span className="separator">/</span>
           <span className="current-info">조류 {hourlyData.volume?.label || '중간'}</span>
+          <button
+            className="refresh-btn"
+            onClick={() => fetchHourlyData(true)}
+            title="실시간 데이터 새로고침"
+            style={{ marginLeft: '10px', padding: '4px 8px', cursor: 'pointer' }}
+          >
+            🔄 새로고침
+          </button>
           {hourlyData.tideSource === 'official' ? (
             <span className="data-source-badge official">공식 조석표</span>
           ) : (
             <span className="data-source-badge simulated">조석 예측치</span>
           )}
-          {hourlyData.weatherSource === 'simulated' && (
-            <span className="data-source-badge simulated">기상 예측치</span>
+          {hourlyData.weatherSource === 'api' ? (
+            <span className="data-source-badge official">기상청 실시간</span>
+          ) : (
+            <span className="data-source-badge simulated">기상 시뮬레이션</span>
+          )}
+          {hourlyData.marineSource === 'api' ? (
+            <span className="data-source-badge official">KHOA 해양관측</span>
+          ) : (
+            <span className="data-source-badge simulated">해양 시뮬레이션</span>
           )}
         </div>
       </div>
@@ -585,8 +608,8 @@ function TidePage({ location, onLocationChange }) {
                   // 조류 세기 판정
                   const currentStrength = item.currentSpeed < 0.15 ? '약' : item.currentSpeed < 0.35 ? '중' : '강'
 
-                  // 근접 극값들 찾기 (displayInterval 고려)
-                  const nearestTides = getNearestTides(item.hour, displayInterval)
+                  // 시간대의 극값 정보 (간조 또는 만조 중 하나)
+                  const tideInfo = getTideSingleInfo(item.hour, displayInterval)
 
                   return (
                     <tr key={idx} className={bgClass}>
@@ -610,14 +633,16 @@ function TidePage({ location, onLocationChange }) {
                       <td className="sun-cell">
                         {sunEvent}
                       </td>
-                      <td className={`tide-cell tide-${nearestTides ? nearestTides.phase : 'none'}`}>
-                        {nearestTides ? (
-                          <span>
-                            {nearestTides.label} {nearestTides.time} ({nearestTides.height.toFixed(2)}m)
-                            <span className={nearestTides.phase === 'high' ? 'tide-up' : 'tide-down'}>
-                              {nearestTides.phase === 'high' ? '↑' : '↓'}{nearestTides.diff.toFixed(2)}m
+                      <td className={`tide-cell ${tideInfo ? (tideInfo.type === 'high' ? 'tide-up' : 'tide-down') : ''}`}>
+                        {tideInfo ? (
+                          <div style={{ fontSize: '0.9em', fontWeight: '500' }}>
+                            <span style={{ color: tideInfo.type === 'high' ? '#0066cc' : '#cc0000' }}>
+                              {tideInfo.label} {tideInfo.time}
                             </span>
-                          </span>
+                            <span style={{ marginLeft: '8px' }}>
+                              ({tideInfo.type === 'high' ? '↑' : '↓'} {tideInfo.diff.toFixed(2)}m)
+                            </span>
+                          </div>
                         ) : (
                           '-'
                         )}
