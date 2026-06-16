@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: fishing-app-backend
+    runtime: python
+    pythonVersion: 3.11
+    buildCommand: pip install -r fishing-app/backend/requirements.txt
+    startCommand: cd fishing-app/backend && python app.py
+    envVars:
+      - key: FLASK_ENV
+        value: production
