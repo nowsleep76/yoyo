@@ -69,15 +69,40 @@ export const apiFetch = async (endpoint, options = {}) => {
  */
 export const apiJson = async (endpoint, options = {}) => {
   const response = await apiFetch(endpoint, options)
-  
+
   if (!response.ok) {
+    const contentType = response.headers.get('content-type')
+    const isHtml = contentType && contentType.includes('text/html')
+
+    if (isHtml) {
+      throw new Error(
+        `백엔드 서버에 연결할 수 없습니다. ` +
+        `${getApiBaseUrl()}이(가) 실행 중인지 확인해주세요.`
+      )
+    }
+
     throw new Error(`API 에러: ${response.status}`)
   }
 
   try {
-    return await response.json()
+    const text = await response.text()
+
+    if (!text) {
+      throw new Error('빈 응답')
+    }
+
+    return JSON.parse(text)
   } catch (e) {
-    console.error('JSON 파싱 에러:', e)
+    console.error('❌ JSON 파싱 에러:', e.message)
+    console.error('엔드포인트:', endpoint)
+
+    if (e.message.includes('Unexpected token')) {
+      throw new Error(
+        `백엔드 서버에 연결할 수 없거나 잘못된 응답입니다. ` +
+        `${getApiBaseUrl()}이(가) 올바르게 응답하는지 확인해주세요.`
+      )
+    }
+
     throw e
   }
 }
