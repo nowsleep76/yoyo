@@ -5,8 +5,8 @@
 
 // API 기본 URL 가져오기
 const getApiBaseUrl = () => {
-  // 1. 환경 변수에서 가져오기
-  if (import.meta.env.VITE_API_URL && import.meta.env.VITE_API_URL !== 'https://api.example.com') {
+  // 1. 환경 변수에서 가져오기 (백엔드 배포 후 설정용)
+  if (import.meta.env.VITE_API_URL) {
     return import.meta.env.VITE_API_URL
   }
 
@@ -19,9 +19,8 @@ const getApiBaseUrl = () => {
     return 'http://localhost:8000'
   }
 
-  // 프로덕션 환경 (현재는 백엔드 없음 - 목데이터 사용)
-  // 나중에 백엔드 배포 후 여기에 URL 설정
-  return '/api-mock'
+  // 프로덕션 환경: /api로 프록시 (vercel.json에서 처리)
+  return '/api'
 }
 
 /**
