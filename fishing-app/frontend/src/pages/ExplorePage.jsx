@@ -1,3 +1,4 @@
+import { apiJson } from '../utils/api'
 import { useState, useEffect, useRef } from 'react'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
@@ -41,7 +42,7 @@ function ExplorePage({ location, onLocationChange }) {
     const fetchCatches = async () => {
       try {
         setLoading(true)
-        const response = await fetch(`/api/catches/feed?sort=${filterType}`)
+        const response = await apiJson(`/api/catches/feed?sort=${filterType}`)
         if (response.ok) {
           const data = await response.json()
           // is_public인 기록만 필터링

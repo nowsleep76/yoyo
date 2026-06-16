@@ -2,6 +2,7 @@ import { useEffect, useState, useRef } from 'react'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { StorageUtils, SafeFetch } from '../utils/storage'
+import { apiJson } from '../utils/api'
 import './TidePage.css'
 
 function TidePage({ location, onLocationChange }) {
@@ -97,15 +98,9 @@ function TidePage({ location, onLocationChange }) {
 
       console.log(`[TidePage] Fetching data for: ${dateStr}, Location: (${displayLocation.latitude}, ${displayLocation.longitude})`)
 
-      const response = await fetch(
+      const data = await apiJson(
         `/api/tide/hourly?lat=${displayLocation.latitude}&lon=${displayLocation.longitude}&date=${dateStr}`
       )
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: 데이터 로드 실패`)
-      }
-
-      const data = await response.json()
 
       // 데이터 검증 로깅 (받은 직후)
       console.log('[TidePage] API Response Data:')
