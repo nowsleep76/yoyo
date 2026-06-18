@@ -199,6 +199,108 @@ def get_lunar_date(target_date):
         'age': round(lunar_age, 1)
     }
 
+def calculate_tide_times_from_lunar(region, lunar_day, date_obj):
+    """음력 날짜와 지역을 기반으로 조석 시간을 계산한다.
+
+    기본항별 만조/간조 기본 시간 (물때 8물 기준):
+    각 물때(1~15)에 따라 시간 오프셋이 적용된다.
+    """
+
+    # 각 지역의 기본 조석 시간 패턴 (물때 8물 기준)
+    base_patterns = {
+        'busan': {
+            'base_high': [10.5, 22.5],  # 기본 만조 시각 (시간.분)
+            'base_low': [4.5, 16.5],    # 기본 간조 시각
+            'period': 12.4  # 반일주기
+        },
+        'incheon': {
+            'base_high': [10.0, 22.0],
+            'base_low': [4.0, 16.0],
+            'period': 12.4
+        },
+        'mokpo': {
+            'base_high': [10.3, 22.3],
+            'base_low': [4.3, 16.3],
+            'period': 12.4
+        },
+        'yeosu': {
+            'base_high': [10.5, 22.5],
+            'base_low': [4.5, 16.5],
+            'period': 12.4
+        },
+        'jeju': {
+            'base_high': [11.5, 23.5],
+            'base_low': [5.5, 17.5],
+            'period': 12.4
+        },
+        'pohang': {
+            'base_high': [11.0, 23.0],
+            'base_low': [5.0, 17.0],
+            'period': 12.4
+        },
+    }
+
+    if region not in base_patterns:
+        return None
+
+    # 물때(1~15)에 따른 시간 오프셋 (분 단위)
+    # 조금(1): 만조 시간이 빠름, 사리(8, 9): 정상, 사리(14, 15): 만조 시간이 늦음
+    tide_offsets = {
+        1:  -45, 2:  -40, 3:  -35, 4:  -25, 5:  -15,
+        6:  -5,  7:  0,   8:  5,   9:  10,  10: 20,
+        11: 30,  12: 35,  13: 40,  14: 45,  15: 50
+    }
+
+    offset_minutes = tide_offsets.get(lunar_day % 15 if (lunar_day % 15) != 0 else 15, 0)
+
+    pattern = base_patterns[region]
+    tides = []
+
+    # 만조 시간 계산
+    for base_time in pattern['base_high']:
+        hour = int(base_time)
+        minute = int((base_time - hour) * 60 + offset_minutes)
+
+        if minute >= 60:
+            hour += 1
+            minute -= 60
+        elif minute < 0:
+            hour -= 1
+            minute += 60
+
+        if 0 <= hour < 24:
+            tides.append({
+                'type': 'high',
+                'time': f'{hour:02d}:{minute:02d}',
+                'hour': hour,
+                'minute': minute
+            })
+
+    # 간조 시간 계산
+    for base_time in pattern['base_low']:
+        hour = int(base_time)
+        minute = int((base_time - hour) * 60 + offset_minutes)
+
+        if minute >= 60:
+            hour += 1
+            minute -= 60
+        elif minute < 0:
+            hour -= 1
+            minute += 60
+
+        if 0 <= hour < 24:
+            tides.append({
+                'type': 'low',
+                'time': f'{hour:02d}:{minute:02d}',
+                'hour': hour,
+                'minute': minute
+            })
+
+    # 시간순 정렬
+    tides.sort(key=lambda x: x['hour'] * 60 + x['minute'])
+
+    return tides
+
 def get_tide_hourly(latitude, longitude, date_str=None):
     """날짜별 24시간 조석 높이 + 수온 + 만조/간조 계산"""
     reference_new_moon = datetime(2000, 1, 6)
@@ -419,44 +521,65 @@ def get_tide_hourly(latitude, longitude, date_str=None):
             except:
                 pass
 
-    # 2단계: 공식 조석표 없으면 시뮬레이션된 반일주기로 계산
+    # 2단계: 공식 조석표 없으면 음력 기반 계산
     else:
-        print(f"[SIMULATION] 공식 조석표 없음, 반일주기 시뮬레이션 사용", flush=True)
+        print(f"[LUNAR_CALC] 음력 기반 조석 시간 계산 (물때: {tide_num})", flush=True)
 
-        half_period = 12.42
-        offset = 6.0 + high_tide_offset
+        # 음력 일수를 사용하여 조석 시간 계산
+        calc_tides = calculate_tide_times_from_lunar(region, lunar_info['day'], target)
 
-        # 극댓값 시간
-        for k in range(3):
-            high_time = offset + 0.21 + k * half_period
-            if 0 <= high_time < 24:
-                high_hour = int(high_time)
-                high_minute = int((high_time - high_hour) * 60)
-                if high_hour < 24:
-                    high_height = hourly[high_hour]['height']
+        if calc_tides:
+            for tide_info in calc_tides:
+                hour = tide_info['hour']
+                minute = tide_info['minute']
+
+                if 0 <= hour < 24:
+                    tide_height = hourly[hour]['height']
                     all_extrema.append({
-                        'type': 'high',
-                        'hour': high_hour,
-                        'minute': high_minute,
-                        'time': f'{high_hour:02d}:{high_minute:02d}',
-                        'height': round(high_height, 2)
+                        'type': tide_info['type'],
+                        'hour': hour,
+                        'minute': minute,
+                        'time': f'{hour:02d}:{minute:02d}',
+                        'height': round(tide_height, 2)
                     })
+        else:
+            # 계산 실패 시 기존 시뮬레이션 사용
+            print(f"[FALLBACK] 계산 실패, 반일주기 시뮬레이션 사용", flush=True)
 
-        # 극솟값 시간
-        for k in range(3):
-            low_time = offset - 6.21 + k * half_period
-            if 0 <= low_time < 24:
-                low_hour = int(low_time)
-                low_minute = int((low_time - low_hour) * 60)
-                if low_hour < 24:
-                    low_height = hourly[low_hour]['height']
-                    all_extrema.append({
-                        'type': 'low',
-                        'hour': low_hour,
-                        'minute': low_minute,
-                        'time': f'{low_hour:02d}:{low_minute:02d}',
-                        'height': round(low_height, 2)
-                    })
+            half_period = 12.42
+            offset = 6.0 + high_tide_offset
+
+            # 극댓값 시간
+            for k in range(3):
+                high_time = offset + 0.21 + k * half_period
+                if 0 <= high_time < 24:
+                    high_hour = int(high_time)
+                    high_minute = int((high_time - high_hour) * 60)
+                    if high_hour < 24:
+                        high_height = hourly[high_hour]['height']
+                        all_extrema.append({
+                            'type': 'high',
+                            'hour': high_hour,
+                            'minute': high_minute,
+                            'time': f'{high_hour:02d}:{high_minute:02d}',
+                            'height': round(high_height, 2)
+                        })
+
+            # 극솟값 시간
+            for k in range(3):
+                low_time = offset - 6.21 + k * half_period
+                if 0 <= low_time < 24:
+                    low_hour = int(low_time)
+                    low_minute = int((low_time - low_hour) * 60)
+                    if low_hour < 24:
+                        low_height = hourly[low_hour]['height']
+                        all_extrema.append({
+                            'type': 'low',
+                            'hour': low_hour,
+                            'minute': low_minute,
+                            'time': f'{low_hour:02d}:{low_minute:02d}',
+                            'height': round(low_height, 2)
+                        })
 
     # 극값들을 시간 순서대로 정렬
     all_extrema.sort(key=lambda x: x['hour'] * 60 + x['minute'])
