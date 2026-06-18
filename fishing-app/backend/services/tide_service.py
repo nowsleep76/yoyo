@@ -99,11 +99,15 @@ def get_lunar_date_accurate(solar_date):
     }
 
 def get_tide_number_from_lunar_date(lunar_info):
-    """음력 날짜에서 물때 계산 (1~15물)"""
+    """음력 날짜에서 물때 계산 (1~15물)
+
+    공식: (음력일 + 6) % 15, 결과가 0이면 15
+    예: 음력 4일 → (4+6)%15 = 10물 (사리)
+    """
     lunar_day = lunar_info['day']
 
-    # 음력 15일 주기로 물때 계산
-    tide_num = (lunar_day % 15) if (lunar_day % 15) != 0 else 15
+    # 음력 날짜 기반 물때 계산 (오프셋 +6)
+    tide_num = ((lunar_day + 6) % 15) if ((lunar_day + 6) % 15) != 0 else 15
 
     return tide_num
 
@@ -320,9 +324,9 @@ def get_tide_hourly(latitude, longitude, date_str=None):
             'age': lunar.day  # 음력 나이 = 음력 일수
         }
 
-        # 물때 계산: 음력 일수 기반 (1~15물 반복)
+        # 물때 계산: 음력 일수 기반 (공식: (음력일+6)%15)
         lunar_day = lunar.day
-        tide_num = (lunar_day % 15) if (lunar_day % 15) != 0 else 15
+        tide_num = ((lunar_day + 6) % 15) if ((lunar_day + 6) % 15) != 0 else 15
         print(f"[DEBUG] Lunar: {lunar.month}/{lunar_day}, Calculated Tide: {tide_num}")
 
     except Exception as e:
@@ -341,13 +345,13 @@ def get_tide_hourly(latitude, longitude, date_str=None):
             }
             # Fallback 물때 계산
             lunar_day = official_lunar['lunar_day']
-            tide_num = (lunar_day % 15) if (lunar_day % 15) != 0 else 15
+            tide_num = ((lunar_day + 6) % 15) if ((lunar_day + 6) % 15) != 0 else 15
             print(f"[FALLBACK] Using table: Lunar {lunar_day}, Tide {tide_num}", file=sys.stderr, flush=True)
         else:
             lunar_info = get_lunar_date(target)
             # Fallback 물때 계산
             lunar_day = lunar_info['day']
-            tide_num = (lunar_day % 15) if (lunar_day % 15) != 0 else 15
+            tide_num = ((lunar_day + 6) % 15) if ((lunar_day + 6) % 15) != 0 else 15
             print(f"[FALLBACK] Using get_lunar_date: Lunar {lunar_day}, Tide {tide_num}", file=sys.stderr, flush=True)
 
     # 위치에 해당하는 해역의 공식 조석표 데이터 조회 (만조/간조 시각만 사용)
