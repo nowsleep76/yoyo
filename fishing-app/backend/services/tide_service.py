@@ -5,13 +5,36 @@ from services.khoa_marine_service import KhoaMarineService
 from services.tides_korea import get_tide_table, get_lunar_conversion
 from lunarcalendar import Converter, Solar
 
-# 한국 조석표 데이터 (위도, 경도, 기준항의 간조/만조 시간 기준)
+# 한국 주요 기본항 정보 (위도, 경도, 지역명, 조석 범위, 구분)
 KOREA_TIDE_REFS = {
-    'busan': {'lat': 35.1, 'lon': 129.1, 'name': '부산'},
-    'incheon': {'lat': 37.2, 'lon': 126.6, 'name': '인천'},
-    'jinhae': {'lat': 35.2, 'lon': 128.6, 'name': '진해'},
-    'pohang': {'lat': 36.0, 'lon': 129.6, 'name': '포항'},
-    'jeju': {'lat': 33.2, 'lon': 126.5, 'name': '제주'},
+    'busan': {
+        'lat': 35.1, 'lon': 129.1, 'name': '부산',
+        'region': '남해', 'range': '1.8m', 'type': '기본항'
+    },
+    'incheon': {
+        'lat': 37.2, 'lon': 126.6, 'name': '인천',
+        'region': '서해', 'range': '6.2m', 'type': '기본항'
+    },
+    'mokpo': {
+        'lat': 34.8, 'lon': 126.4, 'name': '목포',
+        'region': '서해', 'range': '5.8m', 'type': '기본항'
+    },
+    'yeosu': {
+        'lat': 34.7, 'lon': 127.7, 'name': '여수',
+        'region': '남해', 'range': '1.6m', 'type': '기본항'
+    },
+    'jeju': {
+        'lat': 33.2, 'lon': 126.5, 'name': '제주',
+        'region': '제주', 'range': '1.2m', 'type': '기본항'
+    },
+    'pohang': {
+        'lat': 36.0, 'lon': 129.6, 'name': '포항',
+        'region': '동해', 'range': '1.0m', 'type': '기본항'
+    },
+    'jinhae': {
+        'lat': 35.2, 'lon': 128.6, 'name': '진해',
+        'region': '남해', 'range': '1.7m', 'type': '보조항'
+    },
 }
 
 TIDE_VOLUME = {
@@ -581,6 +604,9 @@ def get_tide_hourly(latitude, longitude, date_str=None):
         {'type': 'sunset', 'hour': celestial['sunset'], 'label': '일몰'},
     ]
 
+    # 기본항(기준항) 정보
+    base_station = KOREA_TIDE_REFS.get(region, {})
+
     return {
         'date': target.strftime('%Y-%m-%d'),
         'weekday': ['월','화','수','목','금','토','일'][target.weekday()],
@@ -594,17 +620,20 @@ def get_tide_hourly(latitude, longitude, date_str=None):
         },
         'sunrise': f"{celestial['sunrise']:02d}:{celestial['sunrise_minute']:02d}",
         'sunset': f"{celestial['sunset']:02d}:{celestial['sunset_minute']:02d}",
-        'hourly': hourly,  # 1시간 단위 데이터 (3시간 필터링 제거)
+        'hourly': hourly,  # 1시간 단위 데이터
         'highTides': high_tides_camel,
         'lowTides': low_tides_camel,
         'celestialEvents': celestial_events,
         'location': {
             'latitude': latitude,
-            'longitude': longitude
+            'longitude': longitude,
+            'baseStation': base_station.get('name', '미정의'),  # 기본항 이름
+            'region': base_station.get('region', ''),  # 지역명
+            'tideRange': base_station.get('range', ''),  # 조석 범위
         },
         'weatherSource': weather_source,
         'marineSource': marine_source,
-        'tideSource': tide_source,
+        'tideSource': tide_source if official_tide else 'simulation',
         'tideStrength': official_tide.get('strength', volume['strength']) if official_tide else volume['strength']
     }
 
