@@ -446,6 +446,23 @@ def get_tide_hourly(latitude, longitude, date_str=None):
     high_tides.sort(key=lambda x: x['hour'])
     low_tides.sort(key=lambda x: x['hour'])
 
+    # 인접한 극값 정리 (시간 차이가 2시간 이하이면 첫 번째만 유지)
+    if len(high_tides) > 1:
+        cleaned_high = [high_tides[0]]
+        for i in range(1, len(high_tides)):
+            time_diff = high_tides[i]['hour'] - high_tides[i-1]['hour']
+            if time_diff > 2:  # 2시간보다 커야만 추가 (정확히 2시간 제외)
+                cleaned_high.append(high_tides[i])
+        high_tides = cleaned_high
+
+    if len(low_tides) > 1:
+        cleaned_low = [low_tides[0]]
+        for i in range(1, len(low_tides)):
+            time_diff = low_tides[i]['hour'] - low_tides[i-1]['hour']
+            if time_diff > 2:  # 2시간보다 커야만 추가 (정확히 2시간 제외)
+                cleaned_low.append(low_tides[i])
+        low_tides = cleaned_low
+
     # 극값이 너무 적으면 최대/최소값 기반 추가 (긴급 대체)
     if len(high_tides) == 0 and len(hourly) > 0:
         max_hour = hourly.index(max(hourly, key=lambda x: x['height']))
@@ -468,62 +485,53 @@ def get_tide_hourly(latitude, longitude, date_str=None):
         })
 
     # 만조/간조를 2개씩 생성 (반일주기 조석 - 약 12.4시간)
-    # 극값이 1개씩만 있으면 12시간 근처에서 반대 극값 찾기
+    # 극값이 1개씩만 있으면 12시간 정확히 뒤에 반대 극값 추가
     if len(high_tides) == 1 and len(low_tides) == 1:
         first_high = high_tides[0]
         first_low = low_tides[0]
 
-        # 첫 만조로부터 12시간 뒤 근처에서 간조 찾기 (더 넓은 범위)
-        search_start = (first_high['hour'] + 10) % 24
-        search_end = (first_high['hour'] + 16) % 24
+        # 첫 간조로부터 12시간 뒤에 간조 추가 (다음 간조)
+        second_low_hour = (first_low['hour'] + 12) % 24
+        second_low_height = hourly[second_low_hour]['height']
 
-        if search_start <= search_end:
-            search_hours = list(range(search_start, search_end + 1))
-        else:  # 경계를 넘는 경우
-            search_hours = list(range(search_start, 24)) + list(range(0, search_end + 1))
+        low_tides.append({
+            'hour': second_low_hour,
+            'minute': 30,
+            'time': f'{second_low_hour:02d}:30',
+            'height': round(second_low_height, 2)
+        })
 
-        # 이미 존재하는 극값들 제외
-        search_hours = [h for h in search_hours if h not in (first_high['hour'], first_low['hour'])]
+        # 첫 만조로부터 12시간 뒤에 만조 추가 (다음 만조)
+        second_high_hour = (first_high['hour'] + 12) % 24
+        second_high_height = hourly[second_high_hour]['height']
 
-        if search_hours:
-            min_height = min(hourly[h]['height'] for h in search_hours)
-            for h in search_hours:
-                if abs(hourly[h]['height'] - min_height) < 0.01:
-                    low_tides.append({
-                        'hour': h,
-                        'minute': 30,
-                        'time': f'{h:02d}:30',
-                        'height': round(min_height, 2)
-                    })
-                    break
-
-        # 첫 간조로부터 12시간 뒤 근처에서 만조 찾기
-        search_start = (first_low['hour'] + 10) % 24
-        search_end = (first_low['hour'] + 16) % 24
-
-        if search_start <= search_end:
-            search_hours = list(range(search_start, search_end + 1))
-        else:
-            search_hours = list(range(search_start, 24)) + list(range(0, search_end + 1))
-
-        # 이미 존재하는 극값들 제외
-        search_hours = [h for h in search_hours if h not in (first_high['hour'], first_low['hour'])]
-
-        if search_hours:
-            max_height = max(hourly[h]['height'] for h in search_hours)
-            for h in search_hours:
-                if abs(hourly[h]['height'] - max_height) < 0.01:
-                    high_tides.append({
-                        'hour': h,
-                        'minute': 30,
-                        'time': f'{h:02d}:30',
-                        'height': round(max_height, 2)
-                    })
-                    break
+        high_tides.append({
+            'hour': second_high_hour,
+            'minute': 30,
+            'time': f'{second_high_hour:02d}:30',
+            'height': round(second_high_height, 2)
+        })
 
     # 최종 정렬
     high_tides.sort(key=lambda x: x['hour'])
     low_tides.sort(key=lambda x: x['hour'])
+
+    # 최종 인접 정리 (극값 추가 후)
+    if len(high_tides) > 1:
+        cleaned_high = [high_tides[0]]
+        for i in range(1, len(high_tides)):
+            time_diff = high_tides[i]['hour'] - high_tides[i-1]['hour']
+            if time_diff > 2:
+                cleaned_high.append(high_tides[i])
+        high_tides = cleaned_high
+
+    if len(low_tides) > 1:
+        cleaned_low = [low_tides[0]]
+        for i in range(1, len(low_tides)):
+            time_diff = low_tides[i]['hour'] - low_tides[i-1]['hour']
+            if time_diff > 2:
+                cleaned_low.append(low_tides[i])
+        low_tides = cleaned_low
 
     # 1시간 단위 데이터 사용 (3시간 필터링 제거)
     volume = get_tide_volume(tide_num)
