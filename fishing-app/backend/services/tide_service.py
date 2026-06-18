@@ -354,63 +354,86 @@ def get_tide_hourly(latitude, longitude, date_str=None):
             'precipitation': precipitation
         })
 
-    # 경계 시간대를 위해 이전/다음 값 계산
-    prev_i = -1
-    prev_phase1 = (prev_i - 6 - high_tide_offset) * math.pi / 12.42
-    prev_phase2 = (prev_i - 6 - high_tide_offset) * 2 * math.pi / 12.42
-    prev_height = 2.0 + amplitude * math.sin(prev_phase1) + (amplitude * 0.2) * math.sin(prev_phase2)
-
-    next_i = 24
-    next_phase1 = (next_i - 6 - high_tide_offset) * math.pi / 12.42
-    next_phase2 = (next_i - 6 - high_tide_offset) * 2 * math.pi / 12.42
-    next_height = 2.0 + amplitude * math.sin(next_phase1) + (amplitude * 0.2) * math.sin(next_phase2)
-
-    # 극값(만조/간조) 찾기 - 로컬 최대/최소값 감지
+    # 극값(만조/간조) 찾기 - 공식 조석표 우선, 없으면 시뮬레이션
     import sys
     all_extrema = []
 
-    # 로컬 극값 탐지 (전체 24시간)
-    for i in range(0, 24):
-        curr_h = hourly[i]['height']
+    # 1단계: 공식 조석표 데이터 사용
+    official_tide = get_tide_table(region, target.month, target.day)
 
-        # 경계 처리
-        if i == 0:
-            prev_h = hourly[23]['height']  # 어제 23시
-            next_h = hourly[1]['height']
-        elif i == 23:
-            prev_h = hourly[22]['height']
-            next_h = hourly[0]['height']  # 내일 00시
-        else:
-            prev_h = hourly[i-1]['height']
-            next_h = hourly[i+1]['height']
+    if official_tide:
+        print(f"[TIDE_TABLE] 공식 조석표 사용: low={official_tide.get('low')}, high={official_tide.get('high')}", flush=True)
 
-        # 로컬 최대값: curr_h가 이전/다음보다 크거나 같고, 추세가 전환
-        is_local_max = (curr_h >= prev_h and curr_h >= next_h) or (prev_h < curr_h > next_h)
+        # 공식 간조 시각
+        for time_str in official_tide.get('low', []):
+            try:
+                h, m = map(int, time_str.split(':'))
+                if 0 <= h < 24:
+                    tide_height = hourly[h]['height'] if h < len(hourly) else 1.0
+                    all_extrema.append({
+                        'type': 'low',
+                        'hour': h,
+                        'minute': m,
+                        'time': f'{h:02d}:{m:02d}',
+                        'height': round(tide_height, 2)
+                    })
+            except:
+                pass
 
-        # 로컬 최소값: curr_h가 이전/다음보다 작거나 같고, 추세가 전환
-        is_local_min = (curr_h <= prev_h and curr_h <= next_h) or (prev_h > curr_h < next_h)
+        # 공식 만조 시각
+        for time_str in official_tide.get('high', []):
+            try:
+                h, m = map(int, time_str.split(':'))
+                if 0 <= h < 24:
+                    tide_height = hourly[h]['height'] if h < len(hourly) else 3.0
+                    all_extrema.append({
+                        'type': 'high',
+                        'hour': h,
+                        'minute': m,
+                        'time': f'{h:02d}:{m:02d}',
+                        'height': round(tide_height, 2)
+                    })
+            except:
+                pass
 
-        if is_local_max and not is_local_min:
-            minute = 30
-            time_str = f'{i:02d}:{minute:02d}'
-            all_extrema.append({
-                'type': 'high',
-                'hour': i,
-                'minute': minute,
-                'time': time_str,
-                'height': round(curr_h, 2)
-            })
+    # 2단계: 공식 조석표 없으면 시뮬레이션된 반일주기로 계산
+    else:
+        print(f"[SIMULATION] 공식 조석표 없음, 반일주기 시뮬레이션 사용", flush=True)
 
-        elif is_local_min and not is_local_max:
-            minute = 30
-            time_str = f'{i:02d}:{minute:02d}'
-            all_extrema.append({
-                'type': 'low',
-                'hour': i,
-                'minute': minute,
-                'time': time_str,
-                'height': round(curr_h, 2)
-            })
+        half_period = 12.42
+        offset = 6.0 + high_tide_offset
+
+        # 극댓값 시간
+        for k in range(3):
+            high_time = offset + 0.21 + k * half_period
+            if 0 <= high_time < 24:
+                high_hour = int(high_time)
+                high_minute = int((high_time - high_hour) * 60)
+                if high_hour < 24:
+                    high_height = hourly[high_hour]['height']
+                    all_extrema.append({
+                        'type': 'high',
+                        'hour': high_hour,
+                        'minute': high_minute,
+                        'time': f'{high_hour:02d}:{high_minute:02d}',
+                        'height': round(high_height, 2)
+                    })
+
+        # 극솟값 시간
+        for k in range(3):
+            low_time = offset - 6.21 + k * half_period
+            if 0 <= low_time < 24:
+                low_hour = int(low_time)
+                low_minute = int((low_time - low_hour) * 60)
+                if low_hour < 24:
+                    low_height = hourly[low_hour]['height']
+                    all_extrema.append({
+                        'type': 'low',
+                        'hour': low_hour,
+                        'minute': low_minute,
+                        'time': f'{low_hour:02d}:{low_minute:02d}',
+                        'height': round(low_height, 2)
+                    })
 
     # 극값들을 시간 순서대로 정렬
     all_extrema.sort(key=lambda x: x['hour'] * 60 + x['minute'])
