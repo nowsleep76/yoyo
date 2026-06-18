@@ -1,3 +1,4 @@
+# 조석 데이터 서비스 - 2026-06-18 재배포 (Render 캐시 초기화)
 from datetime import datetime, timedelta
 import math
 from services.kma_weather_service import KmaWeatherService
