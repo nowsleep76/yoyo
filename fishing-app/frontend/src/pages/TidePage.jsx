@@ -278,7 +278,10 @@ function TidePage({ location, onLocationChange }) {
   })
 
   // DEBUG: allTides 순서 확인
+  console.log('[TidePage] API 응답 만조:', hourlyData?.highTides?.map(t => t.time).join(', '))
+  console.log('[TidePage] API 응답 간조:', hourlyData?.lowTides?.map(t => t.time).join(', '))
   console.log('[TidePage] allTides 순서:', allTides.map(t => `${t.time} ${t.type === 'high' ? '만조' : '간조'}`).join(' → '))
+  console.log('[TidePage] 표시될 극값 개수:', allTides.length)
 
   // 각 극값에 대해 직전 극값과의 수위 변화 계산
   allTides.forEach((tide, idx) => {

@@ -417,19 +417,14 @@ def get_tide_hourly(latitude, longitude, date_str=None):
 
     print(f"[EXTREMA] 감지 {len(all_extrema)}개: {[(e['hour'], e['type']) for e in all_extrema]}", flush=True)
 
-    # 극값 간 최소 거리 필터링 (4시간 이상 떨어져 있어야 함)
-    # 하루에 만조/간조가 각각 2번씩 발생하므로 약 12.4시간 주기
+    # 극값 필터링: 교대로 나타나는 타입만 유지 (same-type 연달아 제거)
     filtered_extrema = []
-    min_distance_hours = 4  # 극값 간 최소 거리
 
     for extremum in all_extrema:
         if filtered_extrema:
             last_extremum = filtered_extrema[-1]
-            curr_time = extremum['hour'] * 60 + extremum['minute']
-            last_time = last_extremum['hour'] * 60 + last_extremum['minute']
-
-            # 거리가 충분하고 타입이 다르면 추가
-            if abs(curr_time - last_time) >= min_distance_hours * 60 and extremum['type'] != last_extremum['type']:
+            # 타입이 다르면 추가 (교대 조건)
+            if extremum['type'] != last_extremum['type']:
                 filtered_extrema.append(extremum)
         else:
             # 첫 번째 극값
