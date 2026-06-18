@@ -366,8 +366,14 @@ def get_tide_hourly(latitude, longitude, date_str=None):
     # 대신 lunarcalendar 기반 계산된 tide_num을 사용함
 
     # 실시간 API 데이터 조회
+    print(f"[API] KMA 기상 API 호출 중... (위치: {latitude}, {longitude})", flush=True)
     kma_weather = KmaWeatherService.get_hourly_weather(latitude, longitude, target.strftime('%Y-%m-%d'))
+    print(f"[API] KMA 결과: {'성공' if kma_weather else '실패/없음'} (시간별 {len(kma_weather) if kma_weather else 0}개)", flush=True)
+
+    print(f"[API] KHOA 해양 API 호출 중... (위치: {latitude}, {longitude})", flush=True)
     khoa_marine = KhoaMarineService.get_hourly_marine(latitude, longitude, target.strftime('%Y-%m-%d'))
+    print(f"[API] KHOA 결과: {'성공' if khoa_marine else '실패/없음'}", flush=True)
+
     weather_source = 'api' if kma_weather else 'simulated'
     marine_source = 'api' if khoa_marine else 'simulated'
 
