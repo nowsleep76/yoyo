@@ -490,247 +490,74 @@ def get_tide_hourly(latitude, longitude, date_str=None):
             'precipitation': precipitation
         })
 
-    # 극값(만조/간조) 찾기 - 공식 조석표 우선, 없으면 시뮬레이션
+    # 극값(만조/간조) 찾기 - 시간별 수위 데이터에서 직접 감지
     import sys
     all_extrema = []
 
-    # 1단계: 공식 조석표 데이터 사용
+    # 공식 조석표 데이터는 정확도가 낮으므로, 실제 시간별 수위 데이터에서 극값 감지
     official_tide = get_tide_table(region, target.month, target.day)
 
+    # 시간별 데이터에서 극값 감지 (지역 극값: local extrema)
+    print(f"[EXTREMA_DETECT] 시간별 수위 데이터에서 극값 감지 중...", flush=True)
+    for i in range(1, len(hourly) - 1):
+        curr_height = hourly[i]['height']
+        prev_height = hourly[i-1]['height']
+        next_height = hourly[i+1]['height']
+
+        # 지역 최고점 (만조)
+        if curr_height > prev_height and curr_height > next_height:
+            all_extrema.append({
+                'type': 'high',
+                'hour': i,
+                'minute': 0,
+                'time': f'{i:02d}:00',
+                'height': round(curr_height, 2)
+            })
+        # 지역 최저점 (간조)
+        elif curr_height < prev_height and curr_height < next_height:
+            all_extrema.append({
+                'type': 'low',
+                'hour': i,
+                'minute': 0,
+                'time': f'{i:02d}:00',
+                'height': round(curr_height, 2)
+            })
+
+    print(f"[EXTREMA_DETECT] 감지된 극값: {len(all_extrema)}개", flush=True)
+
+    # 공식 조석표가 있으면 참고만 함 (비교 로그)
     if official_tide:
-        print(f"[TIDE_TABLE] 공식 조석표 사용: low={official_tide.get('low')}, high={official_tide.get('high')}", flush=True)
-
-        # 공식 간조 시각
-        for time_str in official_tide.get('low', []):
-            try:
-                h, m = map(int, time_str.split(':'))
-                if 0 <= h < 24:
-                    tide_height = hourly[h]['height'] if h < len(hourly) else 1.0
-                    all_extrema.append({
-                        'type': 'low',
-                        'hour': h,
-                        'minute': m,
-                        'time': f'{h:02d}:{m:02d}',
-                        'height': round(tide_height, 2)
-                    })
-            except:
-                pass
-
-        # 공식 만조 시각
-        for time_str in official_tide.get('high', []):
-            try:
-                h, m = map(int, time_str.split(':'))
-                if 0 <= h < 24:
-                    tide_height = hourly[h]['height'] if h < len(hourly) else 3.0
-                    all_extrema.append({
-                        'type': 'high',
-                        'hour': h,
-                        'minute': m,
-                        'time': f'{h:02d}:{m:02d}',
-                        'height': round(tide_height, 2)
-                    })
-            except:
-                pass
-
-    # 2단계: 공식 조석표 없으면 음력 기반 계산
-    else:
-        print(f"[LUNAR_CALC] 음력 기반 조석 시간 계산 (물때: {tide_num})", flush=True)
-
-        # 음력 일수를 사용하여 조석 시간 계산
-        calc_tides = calculate_tide_times_from_lunar(region, lunar_info['day'], target)
-
-        if calc_tides:
-            for tide_info in calc_tides:
-                hour = tide_info['hour']
-                minute = tide_info['minute']
-
-                if 0 <= hour < 24:
-                    tide_height = hourly[hour]['height']
-                    all_extrema.append({
-                        'type': tide_info['type'],
-                        'hour': hour,
-                        'minute': minute,
-                        'time': f'{hour:02d}:{minute:02d}',
-                        'height': round(tide_height, 2)
-                    })
-        else:
-            # 계산 실패 시 기존 시뮬레이션 사용
-            print(f"[FALLBACK] 계산 실패, 반일주기 시뮬레이션 사용", flush=True)
-
-            half_period = 12.42
-            offset = 6.0 + high_tide_offset
-
-            # 극댓값 시간
-            for k in range(3):
-                high_time = offset + 0.21 + k * half_period
-                if 0 <= high_time < 24:
-                    high_hour = int(high_time)
-                    high_minute = int((high_time - high_hour) * 60)
-                    if high_hour < 24:
-                        high_height = hourly[high_hour]['height']
-                        all_extrema.append({
-                            'type': 'high',
-                            'hour': high_hour,
-                            'minute': high_minute,
-                            'time': f'{high_hour:02d}:{high_minute:02d}',
-                            'height': round(high_height, 2)
-                        })
-
-            # 극솟값 시간
-            for k in range(3):
-                low_time = offset - 6.21 + k * half_period
-                if 0 <= low_time < 24:
-                    low_hour = int(low_time)
-                    low_minute = int((low_time - low_hour) * 60)
-                    if low_hour < 24:
-                        low_height = hourly[low_hour]['height']
-                        all_extrema.append({
-                            'type': 'low',
-                            'hour': low_hour,
-                            'minute': low_minute,
-                            'time': f'{low_hour:02d}:{low_minute:02d}',
-                            'height': round(low_height, 2)
-                        })
+        print(f"[TIDE_TABLE_REF] 공식 조석표 참고: low={official_tide.get('low')}, high={official_tide.get('high')}", flush=True)
 
     # 극값들을 시간 순서대로 정렬
     all_extrema.sort(key=lambda x: x['hour'] * 60 + x['minute'])
 
     print(f"[EXTREMA] 감지 {len(all_extrema)}개: {[(e['hour'], e['type']) for e in all_extrema]}", flush=True)
 
-    # 극값 필터링: 교대로 나타나는 타입만 유지 (same-type 연달아 제거)
-    filtered_extrema = []
-
-    for extremum in all_extrema:
-        if filtered_extrema:
-            last_extremum = filtered_extrema[-1]
-            # 타입이 다르면 추가 (교대 조건)
-            if extremum['type'] != last_extremum['type']:
-                filtered_extrema.append(extremum)
-        else:
-            # 첫 번째 극값
-            filtered_extrema.append(extremum)
-
-    print(f"[FILTER] 필터링 후 {len(filtered_extrema)}개", flush=True)
-
     # high/low 분류
-    high_tides = [e for e in filtered_extrema if e['type'] == 'high']
-    low_tides = [e for e in filtered_extrema if e['type'] == 'low']
-    print(f"[RESULT] 만조: {len(high_tides)}, 간조: {len(low_tides)}", flush=True)
+    high_tides = [e for e in all_extrema if e['type'] == 'high']
+    low_tides = [e for e in all_extrema if e['type'] == 'low']
 
-    # 정렬 및 최종 포맷 (time 필드만 유지)
+    print(f"[EXTREMA_CLASSIFY] 만조: {len(high_tides)}개, 간조: {len(low_tides)}개", flush=True)
+    print(f"[EXTREMA_CLASSIFY] 만조 시간: {[(t['hour'], t['height']) for t in high_tides]}", flush=True)
+    print(f"[EXTREMA_CLASSIFY] 간조 시간: {[(t['hour'], t['height']) for t in low_tides]}", flush=True)
+
+    # 정렬 (극값이 여러 개일 경우)
     high_tides.sort(key=lambda x: x['hour'])
     low_tides.sort(key=lambda x: x['hour'])
 
-    # 인접한 극값 정리 (시간 차이가 2시간 이하이면 첫 번째만 유지)
-    if len(high_tides) > 1:
-        cleaned_high = [high_tides[0]]
-        for i in range(1, len(high_tides)):
-            time_diff = high_tides[i]['hour'] - high_tides[i-1]['hour']
-            if time_diff > 2:  # 2시간보다 커야만 추가 (정확히 2시간 제외)
-                cleaned_high.append(high_tides[i])
-        high_tides = cleaned_high
-
-    if len(low_tides) > 1:
-        cleaned_low = [low_tides[0]]
-        for i in range(1, len(low_tides)):
-            time_diff = low_tides[i]['hour'] - low_tides[i-1]['hour']
-            if time_diff > 2:  # 2시간보다 커야만 추가 (정확히 2시간 제외)
-                cleaned_low.append(low_tides[i])
-        low_tides = cleaned_low
-
-    # 극값이 너무 적으면 최대/최소값 기반 추가 (긴급 대체)
-    if len(high_tides) == 0 and len(hourly) > 0:
-        max_hour = hourly.index(max(hourly, key=lambda x: x['height']))
-        max_height = hourly[max_hour]['height']
-        high_tides.append({
-            'hour': max_hour,
-            'minute': 30,
-            'time': f'{max_hour:02d}:30',
-            'height': round(max_height, 2)
-        })
-
-    if len(low_tides) == 0 and len(hourly) > 0:
-        min_hour = hourly.index(min(hourly, key=lambda x: x['height']))
-        min_height = hourly[min_hour]['height']
-        low_tides.append({
-            'hour': min_hour,
-            'minute': 30,
-            'time': f'{min_hour:02d}:30',
-            'height': round(min_height, 2)
-        })
-
-    # 만조/간조를 2개씩 생성 (반일주기 조석 - 약 12.4시간)
-    # 극값이 1개씩만 있으면 12시간 정확히 뒤에 반대 극값 추가
-    if len(high_tides) == 1 and len(low_tides) == 1:
-        first_high = high_tides[0]
-        first_low = low_tides[0]
-
-        # 첫 간조로부터 12시간 뒤에 간조 추가 (다음 간조)
-        second_low_hour = (first_low['hour'] + 12) % 24
-        second_low_height = hourly[second_low_hour]['height']
-
-        low_tides.append({
-            'hour': second_low_hour,
-            'minute': 30,
-            'time': f'{second_low_hour:02d}:30',
-            'height': round(second_low_height, 2)
-        })
-
-        # 첫 만조로부터 12시간 뒤에 만조 추가 (다음 만조)
-        second_high_hour = (first_high['hour'] + 12) % 24
-        second_high_height = hourly[second_high_hour]['height']
-
-        high_tides.append({
-            'hour': second_high_hour,
-            'minute': 30,
-            'time': f'{second_high_hour:02d}:30',
-            'height': round(second_high_height, 2)
-        })
-
-    # 최종 정렬
-    high_tides.sort(key=lambda x: x['hour'])
-    low_tides.sort(key=lambda x: x['hour'])
-
-    # 최종 인접 정리 (극값 추가 후)
-    if len(high_tides) > 1:
-        cleaned_high = [high_tides[0]]
-        for i in range(1, len(high_tides)):
-            time_diff = high_tides[i]['hour'] - high_tides[i-1]['hour']
-            if time_diff > 2:
-                cleaned_high.append(high_tides[i])
-        high_tides = cleaned_high
-
-    if len(low_tides) > 1:
-        cleaned_low = [low_tides[0]]
-        for i in range(1, len(low_tides)):
-            time_diff = low_tides[i]['hour'] - low_tides[i-1]['hour']
-            if time_diff > 2:
-                cleaned_low.append(low_tides[i])
-        low_tides = cleaned_low
+    print(f"[EXTREMA_FINAL] 최종 극값 - 만조: {len(high_tides)}개, 간조: {len(low_tides)}개", flush=True)
 
     # 1시간 단위 데이터 사용 (3시간 필터링 제거)
     volume = get_tide_volume(tide_num)
 
-    # 공식 조석표가 있으면 만조/간조 시각을 실제 값으로 대체
-    # 높이는 극값 타입에 따른 표준값 사용 (진폭 기반)
-    if official_tide:
-        # 극값 타입별 높이: 평균 수위 ± 진폭
-        high_height = round(2.0 + amplitude, 2)
-        low_height = round(2.0 - amplitude, 2)
+    # 극값 감지 결과 사용 (공식 조석표보다 정확함)
+    # 극값 감지로 얻은 시간과 높이 그대로 사용
+    high_tides_camel = [{'time': t['time'], 'height': t['height']} for t in high_tides]
+    low_tides_camel = [{'time': t['time'], 'height': t['height']} for t in low_tides]
 
-        high_tides_camel = []
-        for time_str in official_tide['high']:
-            high_tides_camel.append({'time': time_str, 'height': high_height})
-
-        low_tides_camel = []
-        for time_str in official_tide['low']:
-            low_tides_camel.append({'time': time_str, 'height': low_height})
-    else:
-        # 시뮬레이션 데이터: 극값 감지된 값 사용
-        high_tides_camel = [{'time': t['time'], 'height': t['height']} for t in high_tides]
-        low_tides_camel = [{'time': t['time'], 'height': t['height']} for t in low_tides]
-
-    tide_source = 'official' if official_tide else 'simulated'
+    # 데이터 소스: 극값 감지 기반 (공식 조석표 참고용)
+    tide_source = 'detected' if len(all_extrema) > 0 else 'simulated'
 
     # 천체 데이터
     celestial_events = [
