@@ -38,6 +38,10 @@ class Config:
             'KMA_SERVICE_KEY',
             self.api_config.get('kma_service_key')
         )
+        self.api_config['kma_midforecast_key'] = os.getenv(
+            'KMA_MIDFORECAST_KEY',
+            self.api_config.get('kma_midforecast_key', self.api_config.get('kma_service_key'))
+        )
         self.api_config['khoa_service_key'] = os.getenv(
             'KHOA_SERVICE_KEY',
             self.api_config.get('khoa_service_key')

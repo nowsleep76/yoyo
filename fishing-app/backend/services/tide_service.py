@@ -1,7 +1,8 @@
-# 조석 데이터 서비스 - 2026-06-18 재배포 (Render 캐시 초기화)
+# 조석 데이터 서비스 - 동네예보 기반
 from datetime import datetime, timedelta
 import math
 from services.kma_weather_service import KmaWeatherService
+# from services.kma_midforecast_service import KmaMidForecastService  # 향후 사용 예정
 from services.khoa_marine_service import KhoaMarineService
 from services.tides_korea import get_tide_table, get_lunar_conversion
 from lunarcalendar import Converter, Solar
@@ -588,6 +589,12 @@ def get_tide_hourly(latitude, longitude, date_str=None):
     # 기본항(기준항) 정보
     base_station = KOREA_TIDE_REFS.get(region, {})
 
+    # 중기예보 (향후 사용 예정)
+    # - 현재는 동네예보의 시간별 정확한 데이터 사용
+    # - 기상청 중기예보 API는 파라미터 확인 후 추가 예정
+    mid_forecast_today = None
+    mid_forecast_source = 'none'
+
     return {
         'date': target.strftime('%Y-%m-%d'),
         'weekday': ['월','화','수','목','금','토','일'][target.weekday()],
@@ -601,7 +608,7 @@ def get_tide_hourly(latitude, longitude, date_str=None):
         },
         'sunrise': f"{celestial['sunrise']:02d}:{celestial['sunrise_minute']:02d}",
         'sunset': f"{celestial['sunset']:02d}:{celestial['sunset_minute']:02d}",
-        'hourly': hourly,  # 1시간 단위 데이터
+        'hourly': hourly,  # 1시간 단위 데이터 (KMA 동네예보 기반)
         'highTides': high_tides_camel,
         'lowTides': low_tides_camel,
         'celestialEvents': celestial_events,
