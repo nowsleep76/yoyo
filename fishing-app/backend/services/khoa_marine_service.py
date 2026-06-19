@@ -382,3 +382,113 @@ class KhoaMarineService:
             'hourly': hourly_marine,
             'latestData': latest_data
         }
+
+    @staticmethod
+    def get_tide_forecast(latitude: float, longitude: float, date_str: str) -> Optional[Dict]:
+        """KHOA 조석 예보 API - 만조/간조 시간 및 높이 조회
+
+        Args:
+            latitude: 위도
+            longitude: 경도
+            date_str: 날짜 (YYYY-MM-DD 형식)
+
+        Returns:
+            {
+                'highTides': [{'time': 'HH:MM', 'height': float}, ...],
+                'lowTides': [{'time': 'HH:MM', 'height': float}, ...],
+                'source': 'api'
+            }
+        """
+        api_key = config.get_api_key('khoa_service_key')
+        if not api_key:
+            print(f"[KHOA_TIDE] API 키 없음")
+            return None
+
+        # 관측소 코드 조회
+        obs_code = KhoaMarineService._get_obs_code(latitude, longitude)
+        if not obs_code:
+            print(f"[KHOA_TIDE] 관측소 코드 조회 실패")
+            return None
+
+        try:
+            date_yyyymmdd = date_str.replace('-', '')
+
+            # KHOA 조석 예보 API
+            api_url = "https://apis.data.go.kr/1192136/TideResponse"
+            params = {
+                'serviceKey': api_key,
+                'ObsCode': obs_code,
+                'Date': date_yyyymmdd,
+                'resultType': 'json'
+            }
+
+            print(f"[KHOA_TIDE] 조석 예보 API 호출: ObsCode={obs_code}, Date={date_yyyymmdd}", flush=True)
+            response = requests.get(api_url, params=params, timeout=5, verify=False)
+            response.raise_for_status()
+            data = response.json()
+
+            # 응답 파싱
+            body = data.get('response', {}).get('body', {})
+            items = body.get('items', {})
+
+            if isinstance(items, dict):
+                items = items.get('item', [])
+            if isinstance(items, dict):
+                items = [items]
+
+            if not items or len(items) == 0:
+                print(f"[KHOA_TIDE] 응답 데이터 없음")
+                return None
+
+            high_tides = []
+            low_tides = []
+
+            # 각 항목 파싱 (만조/간조)
+            for item in items:
+                # 시간: HH:MM 형식 (예: "07:47")
+                time_str = KhoaMarineService._get_field(item, 'time', 'Time', 'tm', 'TM')
+
+                # 높이: float 값 (예: 3.8)
+                height_str = KhoaMarineService._get_field(item, 'height', 'Height', 'heig', 'HEIG', 'value')
+
+                # 극값 타입: H(만조) 또는 L(간조)
+                type_str = KhoaMarineService._get_field(item, 'type', 'Type', 'gubun', 'GUBUN')
+
+                if not time_str or not height_str or not type_str:
+                    continue
+
+                try:
+                    height = float(height_str)
+                except (TypeError, ValueError):
+                    height = 0.0
+
+                tide_info = {'time': time_str, 'height': height}
+
+                # 만조(H) 또는 간조(L) 분류
+                if 'H' in str(type_str).upper():
+                    high_tides.append(tide_info)
+                elif 'L' in str(type_str).upper():
+                    low_tides.append(tide_info)
+
+            # 시간순 정렬
+            high_tides.sort(key=lambda x: x['time'])
+            low_tides.sort(key=lambda x: x['time'])
+
+            print(f"[KHOA_TIDE] 조석 데이터 수신: 만조 {len(high_tides)}회, 간조 {len(low_tides)}회", flush=True)
+
+            if len(high_tides) == 0 and len(low_tides) == 0:
+                print(f"[KHOA_TIDE] 조석 데이터 파싱 실패")
+                return None
+
+            return {
+                'highTides': high_tides,
+                'lowTides': low_tides,
+                'source': 'api'
+            }
+
+        except requests.exceptions.RequestException as e:
+            print(f"[KHOA_TIDE] API 호출 오류: {e}")
+            return None
+        except Exception as e:
+            print(f"[KHOA_TIDE] 처리 오류: {e}")
+            return None

@@ -490,74 +490,94 @@ def get_tide_hourly(latitude, longitude, date_str=None):
             'precipitation': precipitation
         })
 
-    # 극값(만조/간조) 찾기 - 시간별 수위 데이터에서 직접 감지
+    # 극값(만조/간조) 찾기 - KHOA API > 공식 조석표 > 극값 감지 순서
     import sys
-    all_extrema = []
 
-    # 공식 조석표 데이터는 정확도가 낮으므로, 실제 시간별 수위 데이터에서 극값 감지
+    high_tides = []
+    low_tides = []
+    tide_source = 'simulated'
     official_tide = get_tide_table(region, target.month, target.day)
 
-    # 시간별 데이터에서 극값 감지 (지역 극값: local extrema)
-    print(f"[EXTREMA_DETECT] 시간별 수위 데이터에서 극값 감지 중...", flush=True)
-    for i in range(1, len(hourly) - 1):
-        curr_height = hourly[i]['height']
-        prev_height = hourly[i-1]['height']
-        next_height = hourly[i+1]['height']
+    # 1단계: KHOA 조석 예보 API로부터 실시간 조석 시간 조회
+    print(f"[TIDE_FORECAST] 1. KHOA API 호출 중...", flush=True)
+    api_forecast = KhoaMarineService.get_tide_forecast(latitude, longitude, target.strftime('%Y-%m-%d'))
 
-        # 지역 최고점 (만조)
-        if curr_height > prev_height and curr_height > next_height:
-            all_extrema.append({
-                'type': 'high',
-                'hour': i,
-                'minute': 0,
-                'time': f'{i:02d}:00',
-                'height': round(curr_height, 2)
-            })
-        # 지역 최저점 (간조)
-        elif curr_height < prev_height and curr_height < next_height:
-            all_extrema.append({
-                'type': 'low',
-                'hour': i,
-                'minute': 0,
-                'time': f'{i:02d}:00',
-                'height': round(curr_height, 2)
-            })
+    if api_forecast and api_forecast.get('highTides') and api_forecast.get('lowTides'):
+        # API 데이터 우선 사용
+        print(f"[TIDE_FORECAST] API 성공 - 만조 {len(api_forecast['highTides'])}회, 간조 {len(api_forecast['lowTides'])}회", flush=True)
+        high_tides = api_forecast.get('highTides', [])
+        low_tides = api_forecast.get('lowTides', [])
+        tide_source = 'api'
 
-    print(f"[EXTREMA_DETECT] 감지된 극값: {len(all_extrema)}개", flush=True)
+    # 2단계: KHOA API 실패 시 공식 조석표 사용
+    elif official_tide:
+        print(f"[TIDE_FORECAST] 2. 공식 조석표 사용", flush=True)
 
-    # 공식 조석표가 있으면 참고만 함 (비교 로그)
-    if official_tide:
-        print(f"[TIDE_TABLE_REF] 공식 조석표 참고: low={official_tide.get('low')}, high={official_tide.get('high')}", flush=True)
+        # 공식 조석표의 간조 시각
+        for time_str in official_tide.get('low', []):
+            try:
+                h, m = map(int, time_str.split(':'))
+                tide_height = hourly[h]['height'] if h < len(hourly) else 1.0
+                low_tides.append({'time': time_str, 'height': round(tide_height, 2)})
+            except:
+                pass
 
-    # 극값들을 시간 순서대로 정렬
-    all_extrema.sort(key=lambda x: x['hour'] * 60 + x['minute'])
+        # 공식 조석표의 만조 시각
+        for time_str in official_tide.get('high', []):
+            try:
+                h, m = map(int, time_str.split(':'))
+                tide_height = hourly[h]['height'] if h < len(hourly) else 3.0
+                high_tides.append({'time': time_str, 'height': round(tide_height, 2)})
+            except:
+                pass
 
-    print(f"[EXTREMA] 감지 {len(all_extrema)}개: {[(e['hour'], e['type']) for e in all_extrema]}", flush=True)
+        tide_source = 'official'
 
-    # high/low 분류
-    high_tides = [e for e in all_extrema if e['type'] == 'high']
-    low_tides = [e for e in all_extrema if e['type'] == 'low']
+    # 3단계: 공식 조석표도 없으면 극값 감지
+    else:
+        print(f"[TIDE_FORECAST] 3. 극값 감지로 전환", flush=True)
+        all_extrema = []
 
-    print(f"[EXTREMA_CLASSIFY] 만조: {len(high_tides)}개, 간조: {len(low_tides)}개", flush=True)
-    print(f"[EXTREMA_CLASSIFY] 만조 시간: {[(t['hour'], t['height']) for t in high_tides]}", flush=True)
-    print(f"[EXTREMA_CLASSIFY] 간조 시간: {[(t['hour'], t['height']) for t in low_tides]}", flush=True)
+        # 시간별 데이터에서 극값 감지 (지역 극값: local extrema)
+        for i in range(1, len(hourly) - 1):
+            curr_height = hourly[i]['height']
+            prev_height = hourly[i-1]['height']
+            next_height = hourly[i+1]['height']
 
-    # 정렬 (극값이 여러 개일 경우)
-    high_tides.sort(key=lambda x: x['hour'])
-    low_tides.sort(key=lambda x: x['hour'])
+            # 지역 최고점 (만조)
+            if curr_height > prev_height and curr_height > next_height:
+                all_extrema.append({
+                    'type': 'high',
+                    'hour': i,
+                    'minute': 0,
+                    'time': f'{i:02d}:00',
+                    'height': round(curr_height, 2)
+                })
+            # 지역 최저점 (간조)
+            elif curr_height < prev_height and curr_height < next_height:
+                all_extrema.append({
+                    'type': 'low',
+                    'hour': i,
+                    'minute': 0,
+                    'time': f'{i:02d}:00',
+                    'height': round(curr_height, 2)
+                })
 
-    print(f"[EXTREMA_FINAL] 최종 극값 - 만조: {len(high_tides)}개, 간조: {len(low_tides)}개", flush=True)
+        # high/low 분류
+        high_tides = [e for e in all_extrema if e['type'] == 'high']
+        low_tides = [e for e in all_extrema if e['type'] == 'low']
+        tide_source = 'detected'
 
-    # 1시간 단위 데이터 사용 (3시간 필터링 제거)
+    print(f"[TIDE_FORECAST] 최종 결과 - 만조: {len(high_tides)}회, 간조: {len(low_tides)}회, 소스: {tide_source}", flush=True)
+
+    # 1시간 단위 데이터 사용
     volume = get_tide_volume(tide_num)
 
-    # 극값 감지 결과 사용 (공식 조석표보다 정확함)
-    # 극값 감지로 얻은 시간과 높이 그대로 사용
+    # 조석 시간과 높이 반환
     high_tides_camel = [{'time': t['time'], 'height': t['height']} for t in high_tides]
     low_tides_camel = [{'time': t['time'], 'height': t['height']} for t in low_tides]
 
-    # 데이터 소스: 극값 감지 기반 (공식 조석표 참고용)
-    tide_source = 'detected' if len(all_extrema) > 0 else 'simulated'
+    # tide_source는 이미 설정됨 (API / detected / simulated)
 
     # 천체 데이터
     celestial_events = [
