@@ -7,10 +7,17 @@ import os
 import sys
 import importlib
 
+# Flask 요청 로깅
+import logging
+logging.basicConfig(level=logging.DEBUG)
+log = logging.getLogger('werkzeug')
+log.setLevel(logging.DEBUG)
+
 # 기존 bytecode 캐시 제거
 sys.dont_write_bytecode = True
+sys.dont_write_bytecode = True  # 더블 확인
 
-# 모듈 캐시 완전 초기화 (초기 시작 시에만)
+# 모듈 캐시 완전 초기화
 for module_name in list(sys.modules.keys()):
     if 'services' in module_name or 'routes' in module_name:
         del sys.modules[module_name]
@@ -45,13 +52,26 @@ app.register_blueprint(catches_bp)
 app.register_blueprint(user_bp)
 app.register_blueprint(fishing_index_bp)
 
-# 캐싱 무효화: 모든 API 응답에 no-cache 헤더 추가
+# 요청/응답 로깅 미들웨어 + 모듈 캐시 강제 초기화
+@app.before_request
+def log_before():
+    from flask import request
+    print(f"[REQUEST] {request.method} {request.path} (endpoint: {request.endpoint})", flush=True)
+
+    # 매 요청마다 서비스 모듈 캐시 제거 (Flask 캐시 문제 해결)
+    import sys
+    for module_name in list(sys.modules.keys()):
+        if 'services' in module_name:
+            del sys.modules[module_name]
+
 @app.after_request
 def add_no_cache_headers(response):
     """모든 API 응답에 캐시 무효화 헤더 추가"""
     response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
     response.headers['Pragma'] = 'no-cache'
     response.headers['Expires'] = '0'
+    from flask import request
+    print(f"[RESPONSE] {request.method} {request.path} -> {response.status_code}", flush=True)
     return response
 
 @app.route('/api/health', methods=['GET'])

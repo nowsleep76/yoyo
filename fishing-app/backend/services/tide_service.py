@@ -497,6 +497,7 @@ def get_tide_hourly(latitude, longitude, date_str=None):
     high_tides = []
     low_tides = []
     tide_source = 'simulated'
+    official_tide = None  # 초기화
 
     print(f"[DEBUG_TIDE] 시작: region={region}, month={target.month}, day={target.day}", flush=True)
 
@@ -554,9 +555,11 @@ def get_tide_hourly(latitude, longitude, date_str=None):
                     high_tides = high_list
                     low_tides = low_list
                     tide_source = 'official'
+                    official_tide = official_tide  # 유지
                     print(f"[DEBUG_TIDE] 공식 조석표 사용: {len(high_tides)}회 만조, {len(low_tides)}회 간조", flush=True)
         except Exception as e:
             print(f"[DEBUG_TIDE] 공식 조석표 오류: {str(e)[:100]}", flush=True)
+            official_tide = None
 
     # ===== 3단계: 극값 감지 (KMA 기반 시계열 데이터 분석) =====
     if len(high_tides) < 2 or len(low_tides) < 2:
