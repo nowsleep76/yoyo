@@ -1,4 +1,4 @@
-from flask import Flask
+from flask import Flask, request
 from flask_cors import CORS
 from models.database import init_db
 from dotenv import load_dotenv
@@ -7,15 +7,22 @@ import os
 import sys
 import importlib
 
+# Flask 요청 로깅
+import logging
+logging.basicConfig(level=logging.DEBUG)
+log = logging.getLogger('werkzeug')
+log.setLevel(logging.DEBUG)
+
 # 기존 bytecode 캐시 제거
 sys.dont_write_bytecode = True
 sys.dont_write_bytecode = True  # 더블 확인
 
 # 모듈 캐시 완전 초기화
-if 'services' in sys.modules:
-    del sys.modules['services']
-if 'services.tide_service' in sys.modules:
-    del sys.modules['services.tide_service']
+for module_name in list(sys.modules.keys()):
+    if 'services' in module_name or 'routes' in module_name:
+        del sys.modules[module_name]
+
+print("[INIT APP] 모듈 캐시 삭제 완료", flush=True)
 
 from routes.weather import weather_bp
 from routes.tide import tide_bp
