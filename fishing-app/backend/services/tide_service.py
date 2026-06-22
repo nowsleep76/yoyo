@@ -512,7 +512,53 @@ def get_tide_hourly(latitude, longitude, date_str=None):
     except Exception as e:
         print(f"[DEBUG_TIDE] KHOA API 실패: {str(e)[:100]}", flush=True)
 
-    # ===== 2단계: 극값 감지 (KMA 기반 시계열 데이터 분석) =====
+    # ===== 2단계: 공식 조석표 (정부 공식 데이터) =====
+    if len(high_tides) < 2 or len(low_tides) < 2:
+        try:
+            from services.tides_korea import KOREA_TIDE_TABLES
+
+            official_tide = KOREA_TIDE_TABLES.get(region, {}).get((target.month, target.day))
+            print(f"[DEBUG_TIDE] 공식 조석표: {official_tide is not None}", flush=True)
+
+            if official_tide and isinstance(official_tide, dict):
+                high_list = []
+                low_list = []
+
+                # 간조 처리
+                for time_str in official_tide.get('low', []):
+                    if isinstance(time_str, str) and ':' in time_str:
+                        try:
+                            h, m = map(int, time_str.split(':'))
+                            if h < len(hourly):
+                                height = hourly[h]['height']
+                            else:
+                                height = 0.5
+                            low_list.append({'time': time_str, 'height': round(height, 2)})
+                        except:
+                            pass
+
+                # 만조 처리
+                for time_str in official_tide.get('high', []):
+                    if isinstance(time_str, str) and ':' in time_str:
+                        try:
+                            h, m = map(int, time_str.split(':'))
+                            if h < len(hourly):
+                                height = hourly[h]['height']
+                            else:
+                                height = 3.0
+                            high_list.append({'time': time_str, 'height': round(height, 2)})
+                        except:
+                            pass
+
+                if len(high_list) >= 2 and len(low_list) >= 2:
+                    high_tides = high_list
+                    low_tides = low_list
+                    tide_source = 'official'
+                    print(f"[DEBUG_TIDE] 공식 조석표 사용: {len(high_tides)}회 만조, {len(low_tides)}회 간조", flush=True)
+        except Exception as e:
+            print(f"[DEBUG_TIDE] 공식 조석표 오류: {str(e)[:100]}", flush=True)
+
+    # ===== 3단계: 극값 감지 (KMA 기반 시계열 데이터 분석) =====
     if len(high_tides) < 2 or len(low_tides) < 2:
         print(f"[DEBUG_TIDE] 극값 감지 시작 (현재: {len(high_tides)}회 만조, {len(low_tides)}회 간조)", flush=True)
         extrema = []

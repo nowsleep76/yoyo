@@ -52,11 +52,17 @@ app.register_blueprint(catches_bp)
 app.register_blueprint(user_bp)
 app.register_blueprint(fishing_index_bp)
 
-# 요청/응답 로깅 미들웨어
+# 요청/응답 로깅 미들웨어 + 모듈 캐시 강제 초기화
 @app.before_request
 def log_before():
     from flask import request
     print(f"[REQUEST] {request.method} {request.path} (endpoint: {request.endpoint})", flush=True)
+
+    # 매 요청마다 서비스 모듈 캐시 제거 (Flask 캐시 문제 해결)
+    import sys
+    for module_name in list(sys.modules.keys()):
+        if 'services' in module_name:
+            del sys.modules[module_name]
 
 @app.after_request
 def add_no_cache_headers(response):
