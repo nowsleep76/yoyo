@@ -5,9 +5,17 @@ from dotenv import load_dotenv
 from config import config
 import os
 import sys
+import importlib
 
 # 기존 bytecode 캐시 제거
 sys.dont_write_bytecode = True
+sys.dont_write_bytecode = True  # 더블 확인
+
+# 모듈 캐시 완전 초기화
+if 'services' in sys.modules:
+    del sys.modules['services']
+if 'services.tide_service' in sys.modules:
+    del sys.modules['services.tide_service']
 
 from routes.weather import weather_bp
 from routes.tide import tide_bp
@@ -57,4 +65,4 @@ def uploaded_file(filename):
 
 if __name__ == '__main__':
     init_db()
-    app.run(debug=True, port=8000, host='0.0.0.0', threaded=True, use_reloader=True)
+    app.run(debug=False, port=8000, host='0.0.0.0', threaded=True, use_reloader=False)

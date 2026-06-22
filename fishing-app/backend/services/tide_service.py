@@ -309,6 +309,8 @@ def calculate_tide_times_from_lunar(region, lunar_day, date_obj):
 
 def get_tide_hourly(latitude, longitude, date_str=None):
     """날짜별 24시간 조석 높이 + 수온 + 만조/간조 계산"""
+    import sys
+    print(f"[TRACE] get_tide_hourly called with lat={latitude}, lon={longitude}, date={date_str}", flush=True, file=sys.stderr)
     reference_new_moon = datetime(2000, 1, 6)
 
     if date_str:
@@ -496,11 +498,14 @@ def get_tide_hourly(latitude, longitude, date_str=None):
     low_tides = []
     tide_source = 'simulated'
 
+    print(f"[DEBUG_TIDE] 시작: region={region}, month={target.month}, day={target.day}", flush=True)
+
     # ===== 1단계: 공식 조석표 (가장 정확한 정부 공식 데이터) =====
     try:
         from services.tides_korea import KOREA_TIDE_TABLES
 
         official_tide = KOREA_TIDE_TABLES.get(region, {}).get((target.month, target.day))
+        print(f"[DEBUG_TIDE] official_tide loaded: {official_tide is not None}", flush=True)
 
         if official_tide and isinstance(official_tide, dict):
             # 간조 처리
