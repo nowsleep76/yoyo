@@ -491,82 +491,97 @@ def get_tide_hourly(latitude, longitude, date_str=None):
             'precipitation': precipitation
         })
 
-    # 극값(만조/간조) 찾기 - KHOA API > 공식 조석표 > 극값 감지 순서
-    import sys
-
+    # 극값(만조/간조) 찾기 - 공식 조석표 우선 > KHOA API > 극값 감지
     high_tides = []
     low_tides = []
     tide_source = 'simulated'
-    official_tide = get_tide_table(region, target.month, target.day)
 
-    # 1단계: KHOA 조석 예보 API로부터 실시간 조석 시간 조회
-    print(f"[TIDE_FORECAST] 1. KHOA API 호출 중...", flush=True)
-    api_forecast = KhoaMarineService.get_tide_forecast(latitude, longitude, target.strftime('%Y-%m-%d'))
+    # ===== 1단계: 공식 조석표 (가장 정확한 정부 공식 데이터) =====
+    try:
+        from services.tides_korea import KOREA_TIDE_TABLES
 
-    if api_forecast and api_forecast.get('highTides') and api_forecast.get('lowTides'):
-        # API 데이터 우선 사용
-        print(f"[TIDE_FORECAST] API 성공 - 만조 {len(api_forecast['highTides'])}회, 간조 {len(api_forecast['lowTides'])}회", flush=True)
-        high_tides = api_forecast.get('highTides', [])
-        low_tides = api_forecast.get('lowTides', [])
-        tide_source = 'api'
+        official_tide = KOREA_TIDE_TABLES.get(region, {}).get((target.month, target.day))
 
-    # 2단계: KHOA API 실패 시 공식 조석표 사용
-    elif official_tide:
-        print(f"[TIDE_FORECAST] 2. 공식 조석표 사용", flush=True)
+        if official_tide and isinstance(official_tide, dict):
+            # 간조 처리
+            for time_str in official_tide.get('low', []):
+                if isinstance(time_str, str) and ':' in time_str:
+                    try:
+                        h, m = map(int, time_str.split(':'))
+                        if h < len(hourly):
+                            height = hourly[h]['height']
+                        else:
+                            height = 1.0
+                        low_tides.append({'time': time_str, 'height': round(height, 2)})
+                    except:
+                        pass
 
-        # 공식 조석표의 간조 시각
-        for time_str in official_tide.get('low', []):
-            try:
-                h, m = map(int, time_str.split(':'))
-                tide_height = hourly[h]['height'] if h < len(hourly) else 1.0
-                low_tides.append({'time': time_str, 'height': round(tide_height, 2)})
-            except:
-                pass
+            # 만조 처리
+            for time_str in official_tide.get('high', []):
+                if isinstance(time_str, str) and ':' in time_str:
+                    try:
+                        h, m = map(int, time_str.split(':'))
+                        if h < len(hourly):
+                            height = hourly[h]['height']
+                        else:
+                            height = 3.0
+                        high_tides.append({'time': time_str, 'height': round(height, 2)})
+                    except:
+                        pass
 
-        # 공식 조석표의 만조 시각
-        for time_str in official_tide.get('high', []):
-            try:
-                h, m = map(int, time_str.split(':'))
-                tide_height = hourly[h]['height'] if h < len(hourly) else 3.0
-                high_tides.append({'time': time_str, 'height': round(tide_height, 2)})
-            except:
-                pass
+            if len(high_tides) >= 2 and len(low_tides) >= 2:
+                tide_source = 'official'
+    except:
+        pass
 
-        tide_source = 'official'
+    # ===== 2단계: KHOA API 시도 =====
+    if len(high_tides) < 2 or len(low_tides) < 2:
+        try:
+            api_forecast = KhoaMarineService.get_tide_forecast(latitude, longitude, target.strftime('%Y-%m-%d'))
 
-    # 3단계: 공식 조석표도 없으면 극값 감지
-    else:
-        print(f"[TIDE_FORECAST] 3. 극값 감지로 전환", flush=True)
-        all_extrema = []
+            if api_forecast and len(api_forecast.get('highTides', [])) >= 2 and len(api_forecast.get('lowTides', [])) >= 2:
+                high_tides = api_forecast['highTides']
+                low_tides = api_forecast['lowTides']
+                tide_source = 'api'
+        except:
+            pass
 
-        # 시간별 데이터에서 극값 감지 (지역 극값: local extrema)
-        for i in range(1, len(hourly) - 1):
-            curr_height = hourly[i]['height']
-            prev_height = hourly[i-1]['height']
-            next_height = hourly[i+1]['height']
+    # ===== 3단계: 극값 감지 (최후의 수단) =====
+    if len(high_tides) < 2 or len(low_tides) < 2:
+        extrema = []
 
-            # 지역 최고점 (만조)
-            if curr_height > prev_height and curr_height > next_height:
-                all_extrema.append({
-                    'type': 'high',
-                    'hour': i,
-                    'minute': 0,
-                    'time': f'{i:02d}:00',
-                    'height': round(curr_height, 2)
-                })
-            # 지역 최저점 (간조)
-            elif curr_height < prev_height and curr_height < next_height:
-                all_extrema.append({
-                    'type': 'low',
-                    'hour': i,
-                    'minute': 0,
-                    'time': f'{i:02d}:00',
-                    'height': round(curr_height, 2)
-                })
+        for i in range(2, len(hourly) - 2):
+            h = hourly[i]['height']
 
-        # high/low 분류
-        high_tides = [e for e in all_extrema if e['type'] == 'high']
-        low_tides = [e for e in all_extrema if e['type'] == 'low']
+            # Peak (만조): 중앙값이 주변 4개보다 높음
+            is_peak = (h > hourly[i-2]['height'] and
+                      h > hourly[i-1]['height'] and
+                      h > hourly[i+1]['height'] and
+                      h > hourly[i+2]['height'])
+
+            # Valley (간조): 중앙값이 주변 4개보다 낮음
+            is_valley = (h < hourly[i-2]['height'] and
+                        h < hourly[i-1]['height'] and
+                        h < hourly[i+1]['height'] and
+                        h < hourly[i+2]['height'])
+
+            if is_peak:
+                extrema.append({'type': 'high', 'hour': i, 'time': f'{i:02d}:00', 'height': round(h, 2)})
+            elif is_valley:
+                extrema.append({'type': 'low', 'hour': i, 'time': f'{i:02d}:00', 'height': round(h, 2)})
+
+        # 중복 제거
+        high_tides = []
+        low_tides = []
+
+        for ex in extrema:
+            if ex['type'] == 'high':
+                if not high_tides or abs(ex['hour'] - high_tides[-1]['hour']) >= 6:
+                    high_tides.append(ex)
+            elif ex['type'] == 'low':
+                if not low_tides or abs(ex['hour'] - low_tides[-1]['hour']) >= 6:
+                    low_tides.append(ex)
+
         tide_source = 'detected'
 
     print(f"[TIDE_FORECAST] 최종 결과 - 만조: {len(high_tides)}회, 간조: {len(low_tides)}회, 소스: {tide_source}", flush=True)

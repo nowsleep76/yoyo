@@ -2,11 +2,9 @@
 > fishing-app-frontend@1.0.0 dev
 > vite
 
-
-  [32m[1mVITE[22m v4.5.14[39m  [2mready in [0m[1m687[22m[2m[0m ms[22m
-
-  [32m➜[39m  [1mLocal[22m:   [36mhttp://127.0.0.1:[1m8001[22m/[39m
-(node:26952) [DEP0060] DeprecationWarning: The `util._extend` API is deprecated. Please use Object.assign() instead.
-(Use `node --trace-deprecation ...` to show where the warning was created)
-[2m오전 8:26:16[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/TidePage.jsx[22m
-[2m오전 10:18:06[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/TidePage.jsx[22m
+[31merror when starting dev server:
+Error: Port 8001 is already in use
+    at Server.onError (file:///D:/DEV/fishing-app/frontend/node_modules/vite/dist/node/chunks/dep-827b23df.js:54873:28)
+    at Server.emit (node:events:509:28)
+    at emitErrorNT (node:net:2044:8)
+    at process.processTicksAndRejections (node:internal/process/task_queues:90:21)[39m
