@@ -1,9 +1,10 @@
-npm error Missing script: "start"
-npm error
-npm error Did you mean one of these?
-npm error   npm star # Mark your favorite packages
-npm error   npm stars # View packages marked as favorites
-npm error
-npm error To see a list of scripts, run:
-npm error   npm run
-npm error A complete log of this run can be found in: C:\Users\hns\AppData\Local\npm-cache\_logs\2026-06-22T02_24_17_907Z-debug-0.log
+
+> fishing-app-frontend@1.0.0 dev
+> vite
+
+
+  [32m[1mVITE[22m v4.5.14[39m  [2mready in [0m[1m651[22m[2m[0m ms[22m
+
+  [32m➜[39m  [1mLocal[22m:   [36mhttp://127.0.0.1:[1m8001[22m/[39m
+(node:11196) [DEP0060] DeprecationWarning: The `util._extend` API is deprecated. Please use Object.assign() instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)

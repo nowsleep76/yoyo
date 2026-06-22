@@ -52,13 +52,20 @@ app.register_blueprint(catches_bp)
 app.register_blueprint(user_bp)
 app.register_blueprint(fishing_index_bp)
 
-# 캐싱 무효화: 모든 API 응답에 no-cache 헤더 추가
+# 요청/응답 로깅 미들웨어
+@app.before_request
+def log_before():
+    from flask import request
+    print(f"[REQUEST] {request.method} {request.path} (endpoint: {request.endpoint})", flush=True)
+
 @app.after_request
 def add_no_cache_headers(response):
     """모든 API 응답에 캐시 무효화 헤더 추가"""
     response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
     response.headers['Pragma'] = 'no-cache'
     response.headers['Expires'] = '0'
+    from flask import request
+    print(f"[RESPONSE] {request.method} {request.path} -> {response.status_code}", flush=True)
     return response
 
 @app.route('/api/health', methods=['GET'])

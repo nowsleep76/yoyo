@@ -493,66 +493,28 @@ def get_tide_hourly(latitude, longitude, date_str=None):
             'precipitation': precipitation
         })
 
-    # 극값(만조/간조) 찾기 - 공식 조석표 우선 > KHOA API > 극값 감지
+    # 극값(만조/간조) 찾기 - API 우선 > 극값 감지 > 공식 조석표
     high_tides = []
     low_tides = []
     tide_source = 'simulated'
 
     print(f"[DEBUG_TIDE] 시작: region={region}, month={target.month}, day={target.day}", flush=True)
 
-    # ===== 1단계: 공식 조석표 (가장 정확한 정부 공식 데이터) =====
+    # ===== 1단계: KHOA API 우선 (실시간 해수 데이터) =====
     try:
-        from services.tides_korea import KOREA_TIDE_TABLES
+        api_forecast = KhoaMarineService.get_tide_forecast(latitude, longitude, target.strftime('%Y-%m-%d'))
 
-        official_tide = KOREA_TIDE_TABLES.get(region, {}).get((target.month, target.day))
-        print(f"[DEBUG_TIDE] official_tide loaded: {official_tide is not None}", flush=True)
+        if api_forecast and len(api_forecast.get('highTides', [])) >= 2 and len(api_forecast.get('lowTides', [])) >= 2:
+            high_tides = api_forecast['highTides']
+            low_tides = api_forecast['lowTides']
+            tide_source = 'api'
+            print(f"[DEBUG_TIDE] KHOA API 성공: {len(high_tides)}회 만조, {len(low_tides)}회 간조", flush=True)
+    except Exception as e:
+        print(f"[DEBUG_TIDE] KHOA API 실패: {str(e)[:100]}", flush=True)
 
-        if official_tide and isinstance(official_tide, dict):
-            # 간조 처리
-            for time_str in official_tide.get('low', []):
-                if isinstance(time_str, str) and ':' in time_str:
-                    try:
-                        h, m = map(int, time_str.split(':'))
-                        if h < len(hourly):
-                            height = hourly[h]['height']
-                        else:
-                            height = 1.0
-                        low_tides.append({'time': time_str, 'height': round(height, 2)})
-                    except:
-                        pass
-
-            # 만조 처리
-            for time_str in official_tide.get('high', []):
-                if isinstance(time_str, str) and ':' in time_str:
-                    try:
-                        h, m = map(int, time_str.split(':'))
-                        if h < len(hourly):
-                            height = hourly[h]['height']
-                        else:
-                            height = 3.0
-                        high_tides.append({'time': time_str, 'height': round(height, 2)})
-                    except:
-                        pass
-
-            if len(high_tides) >= 2 and len(low_tides) >= 2:
-                tide_source = 'official'
-    except:
-        pass
-
-    # ===== 2단계: KHOA API 시도 =====
+    # ===== 2단계: 극값 감지 (KMA 기반 시계열 데이터 분석) =====
     if len(high_tides) < 2 or len(low_tides) < 2:
-        try:
-            api_forecast = KhoaMarineService.get_tide_forecast(latitude, longitude, target.strftime('%Y-%m-%d'))
-
-            if api_forecast and len(api_forecast.get('highTides', [])) >= 2 and len(api_forecast.get('lowTides', [])) >= 2:
-                high_tides = api_forecast['highTides']
-                low_tides = api_forecast['lowTides']
-                tide_source = 'api'
-        except:
-            pass
-
-    # ===== 3단계: 극값 감지 (최후의 수단) =====
-    if len(high_tides) < 2 or len(low_tides) < 2:
+        print(f"[DEBUG_TIDE] 극값 감지 시작 (현재: {len(high_tides)}회 만조, {len(low_tides)}회 간조)", flush=True)
         extrema = []
 
         for i in range(2, len(hourly) - 2):
