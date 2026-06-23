@@ -84,16 +84,15 @@ def fetch_tide():
 
 @tide_bp.route('/api/tide/hourly', methods=['GET'])
 def fetch_tide_hourly():
-    print("[ROUTE] fetch_tide_hourly 호출됨!", flush=True)
-    # 호출 여부 확인용
-    with open('fetch_called.log', 'a') as f:
-        f.write('fetch_tide_hourly called\n')
+    # 매 요청마다 모든 서비스 모듈 강제 재로드
+    mods_to_delete = [m for m in list(sys.modules.keys()) if any(x in m for x in ['tide_service', 'tides_korea'])]
+    for mod_name in mods_to_delete:
+        try:
+            del sys.modules[mod_name]
+        except:
+            pass
 
-    # 항상 최신 모듈 로드
-    for mod in list(sys.modules.keys()):
-        if 'services.tide_service' in mod:
-            del sys.modules[mod]
-
+    # 새로 import (반드시 캐시가 없는 상태에서)
     from services.tide_service import get_tide_hourly
 
     latitude = request.args.get('lat', type=float, default=37.5665)

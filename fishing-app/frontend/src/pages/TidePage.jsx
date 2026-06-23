@@ -23,11 +23,11 @@ function TidePage({ location, onLocationChange }) {
         console.warn('저장된 위치 파싱 실패:', e)
       }
     }
-    // 기본값으로 기본 좌표 반환 (location prop이 아직 available하지 않을 수 있음)
+    // 기본값: 인천 (공식 조석표 데이터 지원 지역)
     return {
-      latitude: 37.5665,
-      longitude: 126.9780,
-      name: '내 위치'
+      latitude: 37.28,
+      longitude: 126.38,
+      name: '인천'
     }
   })
   const [activeTab, setActiveTab] = useState('tide')
