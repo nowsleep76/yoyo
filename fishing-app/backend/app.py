@@ -90,10 +90,6 @@ def uploaded_file(filename):
 
 if __name__ == '__main__':
     init_db()
-    try:
-        from waitress import serve
-        print("[START] Waitress WSGI 서버 시작...", flush=True)
-        serve(app, host='0.0.0.0', port=8000, threads=4)
-    except ImportError:
-        print("[START] Flask 개발 서버로 시작...", flush=True)
-        app.run(debug=False, port=8000, host='0.0.0.0', threaded=True, use_reloader=False)
+    # Flask 개발 서버 사용 (모듈 캐싱 이슈 해결)
+    print("[START] Flask 개발 서버 시작...", flush=True)
+    app.run(debug=False, port=8000, host='0.0.0.0', threaded=True, use_reloader=False)
