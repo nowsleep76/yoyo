@@ -6,17 +6,26 @@ from config import config
 import os
 import sys
 import importlib
+import importlib.util
 
 # 기존 bytecode 캐시 제거
 sys.dont_write_bytecode = True
 
-# 모듈 캐시 완전 초기화 (초기 시작 시에만)
-for module_name in list(sys.modules.keys()):
-    if 'services' in module_name or 'routes' in module_name:
-        del sys.modules[module_name]
+# 매번 routes와 services 모듈을 강제로 다시 로드합니다
+def reload_route_modules():
+    """routes와 services 모듈을 강제로 다시 로드합니다."""
+    # sys.modules에서 제거
+    for module_name in list(sys.modules.keys()):
+        if 'services' in module_name or 'routes' in module_name or 'models' in module_name:
+            try:
+                del sys.modules[module_name]
+            except:
+                pass
 
+reload_route_modules()
 print("[INIT APP] 모듈 캐시 삭제 완료", flush=True)
 
+# importlib를 사용하여 강제로 새로 로드합니다
 from routes.weather import weather_bp
 from routes.tide import tide_bp
 from routes.points import points_bp
@@ -58,6 +67,22 @@ def add_no_cache_headers(response):
 def health():
     return {'status': 'ok'}, 200
 
+@app.route('/api/debug/routes', methods=['GET'])
+def debug_routes():
+    try:
+        import sys
+        import importlib
+        routes = [{'rule': str(rule), 'endpoint': rule.endpoint} for rule in app.url_map.iter_rules() if 'tide' in rule.rule]
+        modules = [m for m in sys.modules.keys() if 'routes' in m]
+        tide_module = importlib.import_module('routes.tide')
+        return {
+            'routes': routes,
+            'modules_loaded': modules,
+            'routes_tide_location': str(tide_module.__file__)
+        }
+    except Exception as e:
+        return {'error': str(e)}, 500
+
 @app.route('/uploads/<filename>')
 def uploaded_file(filename):
     from flask import send_from_directory
@@ -65,4 +90,10 @@ def uploaded_file(filename):
 
 if __name__ == '__main__':
     init_db()
-    app.run(debug=False, port=8000, host='0.0.0.0', threaded=True, use_reloader=False)
+    try:
+        from waitress import serve
+        print("[START] Waitress WSGI 서버 시작...", flush=True)
+        serve(app, host='0.0.0.0', port=8000, threads=4)
+    except ImportError:
+        print("[START] Flask 개발 서버로 시작...", flush=True)
+        app.run(debug=False, port=8000, host='0.0.0.0', threaded=True, use_reloader=False)
