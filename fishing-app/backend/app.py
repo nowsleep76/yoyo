@@ -6,26 +6,25 @@ from config import config
 import os
 import sys
 import importlib
-import importlib.util
 
 # 기존 bytecode 캐시 제거
 sys.dont_write_bytecode = True
 
-# 매번 routes와 services 모듈을 강제로 다시 로드합니다
-def reload_route_modules():
-    """routes와 services 모듈을 강제로 다시 로드합니다."""
-    # sys.modules에서 제거
-    for module_name in list(sys.modules.keys()):
-        if 'services' in module_name or 'routes' in module_name or 'models' in module_name:
-            try:
-                del sys.modules[module_name]
-            except:
-                pass
+# 매번 모듈을 강제로 다시 로드합니다 (Flask 캐싱 이슈 해결)
+def reload_modules():
+    """routes, services 모듈을 강제로 다시 로드합니다."""
+    modules_to_reload = [k for k in sys.modules.keys()
+                        if any(x in k for x in ['routes', 'services', 'models'])]
+    for mod_name in modules_to_reload:
+        try:
+            del sys.modules[mod_name]
+        except:
+            pass
 
-reload_route_modules()
+reload_modules()
 print("[INIT APP] 모듈 캐시 삭제 완료", flush=True)
 
-# importlib를 사용하여 강제로 새로 로드합니다
+# 모듈 임포트
 from routes.weather import weather_bp
 from routes.tide import tide_bp
 from routes.points import points_bp

@@ -493,10 +493,10 @@ def get_tide_hourly(latitude, longitude, date_str=None):
             'precipitation': precipitation
         })
 
-    # 극값(만조/간조) 찾기 - API 우선 > 극값 감지 > 공식 조석표
+    # 만조/간조 찾기 - API 우선 > 공식 조석표 (시뮬레이션 제거)
     high_tides = []
     low_tides = []
-    tide_source = 'simulated'
+    tide_source = None  # 설정되지 않으면 에러 반환
     official_tide = None  # 초기화
 
     print(f"[DEBUG_TIDE] 시작: region={region}, month={target.month}, day={target.day}", flush=True)
@@ -561,46 +561,19 @@ def get_tide_hourly(latitude, longitude, date_str=None):
             print(f"[DEBUG_TIDE] 공식 조석표 오류: {str(e)[:100]}", flush=True)
             official_tide = None
 
-    # ===== 3단계: 극값 감지 (KMA 기반 시계열 데이터 분석) =====
+    # ===== 3단계: 실제 데이터 필수 (극값 감지 제거 - 시뮬레이션 데이터 금지) =====
     if len(high_tides) < 2 or len(low_tides) < 2:
-        print(f"[DEBUG_TIDE] 극값 감지 시작 (현재: {len(high_tides)}회 만조, {len(low_tides)}회 간조)", flush=True)
-        extrema = []
-
-        for i in range(2, len(hourly) - 2):
-            h = hourly[i]['height']
-
-            # Peak (만조): 중앙값이 주변 4개보다 높음
-            is_peak = (h > hourly[i-2]['height'] and
-                      h > hourly[i-1]['height'] and
-                      h > hourly[i+1]['height'] and
-                      h > hourly[i+2]['height'])
-
-            # Valley (간조): 중앙값이 주변 4개보다 낮음
-            is_valley = (h < hourly[i-2]['height'] and
-                        h < hourly[i-1]['height'] and
-                        h < hourly[i+1]['height'] and
-                        h < hourly[i+2]['height'])
-
-            if is_peak:
-                extrema.append({'type': 'high', 'hour': i, 'time': f'{i:02d}:00', 'height': round(h, 2)})
-            elif is_valley:
-                extrema.append({'type': 'low', 'hour': i, 'time': f'{i:02d}:00', 'height': round(h, 2)})
-
-        # 중복 제거
+        print(f"[TIDE_FORECAST] 경고: 실제 조석 데이터 없음 (만조: {len(high_tides)}회, 간조: {len(low_tides)}회)", flush=True)
+        print(f"[TIDE_FORECAST] 요청 지역에 대한 KHOA API 또는 공식 조석표 데이터가 필요합니다", flush=True)
+        # 실제 데이터가 없으면 빈 배열 반환 (시뮬레이션 데이터는 위험하므로 제거)
         high_tides = []
         low_tides = []
+        tide_source = 'none'
 
-        for ex in extrema:
-            if ex['type'] == 'high':
-                if not high_tides or abs(ex['hour'] - high_tides[-1]['hour']) >= 6:
-                    high_tides.append(ex)
-            elif ex['type'] == 'low':
-                if not low_tides or abs(ex['hour'] - low_tides[-1]['hour']) >= 6:
-                    low_tides.append(ex)
-
-        tide_source = 'detected'
-
-    print(f"[TIDE_FORECAST] 최종 결과 - 만조: {len(high_tides)}회, 간조: {len(low_tides)}회, 소스: {tide_source}", flush=True)
+    if tide_source:
+        print(f"[TIDE_FORECAST] 최종 결과 - 만조: {len(high_tides)}회, 간조: {len(low_tides)}회, 소스: {tide_source}", flush=True)
+    else:
+        print(f"[TIDE_FORECAST] 실제 데이터 없음 - 빈 응답 반환", flush=True)
 
     # 1시간 단위 데이터 사용
     volume = get_tide_volume(tide_num)
@@ -652,7 +625,7 @@ def get_tide_hourly(latitude, longitude, date_str=None):
         },
         'weatherSource': weather_source,
         'marineSource': marine_source,
-        'tideSource': tide_source if official_tide else 'simulation',
+        'tideSource': tide_source or 'none',  # 실제 데이터만 (시뮬레이션 제거)
         'tideStrength': official_tide.get('strength', volume['strength']) if official_tide else volume['strength']
     }
 

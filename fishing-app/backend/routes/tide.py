@@ -103,24 +103,22 @@ def fetch_tide_hourly():
     # get_tide_hourly 호출
     hourly_data = get_tide_hourly(latitude, longitude, date_str)
 
-    # 공식 조석표 우선 오버라이드
+    # 공식 조석표 필수 사용 (실제 데이터만)
     if date_str:
-        print(f"[TIDE] date_str={date_str}", flush=True)
         date_obj = datetime.strptime(date_str, '%Y-%m-%d')
         official_times = get_official_tide_times(latitude, longitude, date_obj)
-        print(f"[TIDE] official_times={official_times}", flush=True)
 
         if official_times:
             high_list = []
             low_list = []
 
+            # 공식 시간 기반 높이 추출
             for time_str in official_times['high']:
                 try:
                     hour = int(time_str.split(':')[0])
                     height = hourly_data['hourly'][hour]['height']
                     high_list.append({'time': time_str, 'height': round(height, 2)})
                 except Exception as e:
-                    print(f"[TIDE] high error: {e}", flush=True)
                     high_list.append({'time': time_str, 'height': 3.0})
 
             for time_str in official_times['low']:
@@ -129,15 +127,20 @@ def fetch_tide_hourly():
                     height = hourly_data['hourly'][hour]['height']
                     low_list.append({'time': time_str, 'height': round(height, 2)})
                 except Exception as e:
-                    print(f"[TIDE] low error: {e}", flush=True)
                     low_list.append({'time': time_str, 'height': 0.0})
 
-            print(f"[TIDE] high_list={high_list}, low_list={low_list}", flush=True)
+            # 공식 데이터 적용
             if len(high_list) >= 2 and len(low_list) >= 2:
                 hourly_data['highTides'] = high_list
                 hourly_data['lowTides'] = low_list
                 hourly_data['tideSource'] = 'official'
-                print(f"[TIDE] 공식 데이터 적용됨!", flush=True)
+                print(f"[TIDE] 공식 조석표 적용: {[h['time'] for h in high_list]} / {[l['time'] for l in low_list]}", flush=True)
+        else:
+            # 공식 데이터 없음 = 지원하지 않는 지역 또는 날짜
+            print(f"[TIDE] 경고: {latitude}, {longitude}에 대한 공식 조석표 데이터 없음", flush=True)
+            hourly_data['highTides'] = []
+            hourly_data['lowTides'] = []
+            hourly_data['tideSource'] = 'none'
 
     return jsonify(hourly_data)
 
